@@ -1231,4 +1231,735 @@ arrow/.style={->, thick}
 \label{fig:grafo_concurrente}
 \end{figure}
 
+\section{Evaluación experimental (simulada): Estado \(P\) secuencial}
+
+Esta sección presenta una evaluación experimental \textbf{simulada} del sistema en su \textbf{Estado \(P\)}
+(secuencial), con el objetivo de caracterizar su desempeño base (baseline) antes de la introducción del Estado \(Q\)
+(concurrente). La simulación permite controlar de forma explícita el costo de operaciones \textit{I/O-bound}
+(\texttt{read} y \texttt{update}) y el costo de operaciones \textit{CPU-bound} (\texttt{analyze} y \texttt{optimize}),
+manteniendo la estructura formal del pipeline descrito en secciones previas.
+
+\subsection{Objetivo experimental}
+
+El objetivo es cuantificar el costo temporal del ciclo de control secuencial sobre una red de \(n\) intersecciones,
+mediante mediciones de:
+
+\begin{itemize}
+\item \textbf{Latencia por ciclo} (tiempo total en procesar todas las intersecciones una vez).
+\item \textbf{Tiempo promedio por intersección} (latencia por ciclo dividida entre \(n\)).
+\item \textbf{Throughput} aproximado en intersecciones/segundo.
+\end{itemize}
+
+Esta línea base se usa posteriormente para comparar con el Estado \(Q\).
+
+\subsection{Hipótesis experimental}
+
+Sea \(n\) el número de intersecciones. En el Estado \(P\) el sistema procesa:
+\[
+P = F(i_1); F(i_2); \dots ; F(i_n)
+\]
+donde:
+\[
+F(i)= read(i); analyze(i); optimize(i); update(i)
+\]
+
+\textbf{Hipótesis (H1):} La latencia total por ciclo crecerá linealmente con \(n\), i.e.,
+\[
+T_P(n) = \Theta(n)
+\]
+y el tiempo por intersección tenderá a una constante aproximada:
+\[
+\frac{T_P(n)}{n} \approx \overline{t_r+t_a+t_o+t_u}
+\]
+
+\section{Evaluación experimental (simulada): Estado \(P\) secuencial sin POO}
+
+Esta sección presenta una evaluación experimental \textbf{simulada} del sistema en el \textbf{Estado \(P\)},
+definido como un \textbf{baseline secuencial sin Programación Orientada a Objetos}. En este estado,
+la implementación se construye únicamente con \textbf{funciones} y un \textbf{bucle secuencial} que procesa
+las intersecciones en un orden total, sin concurrencia y sin modularización por clases.
+
+\subsection{Objetivo experimental}
+
+El objetivo es medir el costo temporal del procesamiento secuencial conforme crece el número de intersecciones \(n\),
+y establecer una referencia (baseline) para comparaciones posteriores con el Estado \(Q\).
+Las métricas principales son:
+
+\begin{itemize}
+\item \textbf{Latencia por ciclo} \(T_P\): tiempo total requerido para procesar \(n\) intersecciones en un ciclo.
+\item \textbf{Tiempo promedio por intersección} \(T_P/n\).
+\item \textbf{Throughput} aproximado: \(n/T_P\) intersecciones por segundo.
+\end{itemize}
+
+\subsection{Definición operacional del pipeline secuencial}
+
+Sea \(I=\{i_1,\dots,i_n\}\) el conjunto de intersecciones. Para cada intersección \(i\), el pipeline funcional se
+define como:
+
+\[
+F(i) = read(i);\; analyze(i);\; optimize(i);\; update(i)
+\]
+
+donde:
+
+\begin{itemize}
+\item \(read(i)\): adquisición de datos de tráfico (I/O simulado).
+\item \(analyze(i)\): extracción de métricas (CPU simulado).
+\item \(optimize(i)\): cálculo del plan semafórico (CPU ligero).
+\item \(update(i)\): aplicación del plan al controlador (I/O simulado).
+\end{itemize}
+
+El Estado \(P\) impone una \textbf{composición secuencial} estricta:
+
+\[
+P = F(i_1);\;F(i_2);\;\cdots;\;F(i_n)
+\]
+
+\subsection{Hipótesis experimental}
+
+\textbf{Hipótesis (H1):} Si el sistema se ejecuta en el Estado \(P\) (secuencial sin POO), entonces el tiempo total por
+ciclo crece de manera aproximadamente lineal con el número de intersecciones:
+
+\[
+T_P(n) = \Theta(n)
+\]
+
+Asumiendo costos promedio por etapa \(\overline{t_r},\overline{t_a},\overline{t_o},\overline{t_u}\), se aproxima:
+
+\[
+T_P(n) \approx n\left(\overline{t_r}+\overline{t_a}+\overline{t_o}+\overline{t_u}\right)
+\]
+
+\subsection{Diseño experimental}
+
+\subsubsection{Variables independientes}
+
+\begin{itemize}
+\item \(n\): número de intersecciones.
+\item \(c\): número de ciclos ejecutados.
+\item \(t_r\): latencia I/O simulada de lectura \texttt{read} (ms).
+\item \(t_u\): latencia I/O simulada de actualización \texttt{update} (ms).
+\item \(W\): carga CPU simulada en \texttt{analyze} (iteraciones).
+\end{itemize}
+
+\subsubsection{Variables dependientes}
+
+\begin{itemize}
+\item \(T_P^{(k)}\): tiempo por ciclo \(k\).
+\item \(T_P^{(k)}/n\): tiempo promedio por intersección.
+\item \(Throughput^{(k)} \approx n/T_P^{(k)}\).
+\end{itemize}
+
+\subsection{Escenario de simulación}
+
+La simulación preserva la estructura computacional del pipeline, sustituyendo:
+
+\begin{itemize}
+\item I/O real (sensores/red/controlador) por retardos \texttt{sleep} parametrizables.
+\item cómputo real por una carga CPU controlada \(W\) (operaciones trigonométricas).
+\end{itemize}
+
+El objetivo es reproducibilidad y control experimental, no fidelidad física del tráfico.
+
+\subsection{Procedimiento experimental}
+
+Para cada ciclo \(k \in \{1,\dots,c\}\):
+
+\begin{enumerate}
+\item Iniciar temporizador \(t_{start}^{(k)}\).
+\item Para \(i = 1\) hasta \(n\), ejecutar secuencialmente:
+\[
+read(i);\; analyze(i);\; optimize(i);\; update(i)
+\]
+\item Detener temporizador \(t_{end}^{(k)}\) y registrar:
+\[
+T_P^{(k)} = t_{end}^{(k)} - t_{start}^{(k)}
+\]
+\item Calcular:
+\[
+\overline{T}_{int}^{(k)} = \frac{T_P^{(k)}}{n},
+\qquad
+Throughput^{(k)} \approx \frac{n}{T_P^{(k)}}
+\]
+\end{enumerate}
+
+\subsection{Instrumentación y métricas}
+
+La medición del tiempo se realiza con temporizador de alta resolución:
+
+\[
+T_P^{(k)} = t_{end}^{(k)} - t_{start}^{(k)}
+\]
+
+y se reporta un resumen con promedio y máximo:
+
+\[
+\overline{T}_P = \frac{1}{c}\sum_{k=1}^{c} T_P^{(k)},
+\qquad
+T_P^{max} = \max_k T_P^{(k)}
+\]
+
+\subsection{Interpretación formal del orden secuencial}
+
+En el Estado \(P\) existe un orden total entre intersecciones:
+
+\[
+F(i_j) \prec F(i_{j+1})
+\]
+
+equivalentemente:
+
+\[
+start(F(i_{j+1})) \ge end(F(i_j))
+\]
+
+Por tanto, \textbf{no hay solapamiento} de cómputo ni de espera por I/O; cualquier latencia de \texttt{read} o
+\texttt{update} bloquea el progreso del ciclo completo.
+
+\subsection{Amenazas a la validez}
+
+\begin{itemize}
+\item \textbf{Validez externa:} la latencia I/O es simulada y no refleja contención real de red/sensores.
+\item \textbf{Validez de construcción:} la carga CPU \(W\) aproxima cómputo, pero no modela algoritmos de optimización reales.
+\item \textbf{Efectos del entorno:} procesos del sistema operativo y variaciones de frecuencia pueden afectar mediciones.
+\end{itemize}
+
+\subsection{Resultados esperados}
+
+Dado el modelo secuencial, se espera observar:
+
+\begin{itemize}
+\item crecimiento aproximadamente lineal de \(T_P\) conforme aumenta \(n\),
+\item \(T_P/n\) aproximadamente constante si las latencias simuladas se mantienen fijas,
+\item throughput limitado por el bloqueo secuencial de etapas I/O.
+\end{itemize}
+
+\section{Evaluación experimental (simulada): Estado \(Q\) concurrente con POO}
+
+En esta sección se presenta una evaluación experimental \textbf{simulada} del sistema en el \textbf{Estado \(Q\)},
+definido como una versión \textbf{con Programación Orientada a Objetos (POO)} y \textbf{concurrencia/paralelismo}
+para procesar múltiples intersecciones por ciclo.
+
+A diferencia del Estado \(P\) (secuencial sin POO), el Estado \(Q\) introduce:
+
+\begin{itemize}
+\item \textbf{Arquitectura modular POO} (SRP, OCP, DIP) para desacoplar etapas del pipeline.
+\item \textbf{Strategy} para intercambiar algoritmos de optimización sin modificar el controlador.
+\item \textbf{Orquestación concurrente híbrida}:
+  \begin{itemize}
+    \item \textbf{AsyncIO} para etapas \textit{I/O-bound} (\texttt{read}, \texttt{update}).
+    \item \textbf{Multiprocessing} para etapas \textit{CPU-bound} (\texttt{analyze} y \texttt{optimize}).
+  \end{itemize}
+\end{itemize}
+
+\subsection{Objetivo experimental}
+
+El objetivo es medir el impacto del Estado \(Q\) sobre el rendimiento del sistema,
+evaluando:
+
+\begin{itemize}
+\item \textbf{Latencia por ciclo} \(T_Q\).
+\item \textbf{Tiempo promedio por intersección} \(T_Q/n\).
+\item \textbf{Throughput} aproximado: \(n/T_Q\).
+\item \textbf{Speedup} respecto al baseline secuencial (si se compara con \(T_P\)):
+\[
+S = \frac{T_P}{T_Q}
+\]
+\item \textbf{Eficiencia paralela}:
+\[
+E = \frac{S}{p}
+\]
+donde \(p\) es el número de procesos.
+\end{itemize}
+
+\subsection{Arquitectura POO utilizada}
+
+El Estado \(Q\) implementa el sistema como:
+
+\[
+System = \langle Acquisition,\ Processing,\ Optimization,\ Control \rangle
+\]
+
+y el pipeline por intersección como composición:
+
+\[
+Pipeline(i) = Update \circ Optimize \circ Analyze \circ Read
+\]
+
+donde las responsabilidades se materializan en componentes:
+
+\begin{itemize}
+\item \textbf{Acquisition}: \texttt{TrafficSensorReaderAsync}
+\item \textbf{Processing}: \texttt{TrafficAnalyzer}
+\item \textbf{Optimization}: \texttt{ISignalOptimizer} (Strategy) + implementaciones
+\item \textbf{Control}: \texttt{TrafficControllerAsync}
+\end{itemize}
+
+Este diseño soporta DIP:
+
+\[
+TrafficController \rightarrow ISignalOptimizer
+\]
+
+y OCP:
+
+\[
+\text{Agregar nueva estrategia} \Rightarrow \text{no modificar Controller}
+\]
+
+\subsection{Definición operacional del ciclo concurrente}
+
+Sea \(I=\{i_1,\dots,i_n\}\). El Estado \(Q\) reemplaza la composición estrictamente secuencial por un ciclo en tres fases:
+
+\paragraph{Fase 1 (I/O concurrente):}
+\[
+D = \{\,read(i)\mid i\in I\,\}
+\]
+ejecutada con \textbf{AsyncIO}, lo que permite solapar latencias de adquisición.
+
+\paragraph{Fase 2 (CPU paralela):}
+\[
+\{(features(i),plan(i))\mid i\in I\} = \{\,optimize(analyze(d_i))\,\}
+\]
+ejecutada con \textbf{multiprocessing} usando \(p\) procesos, evitando el GIL en Python.
+
+\paragraph{Fase 3 (I/O concurrente):}
+\[
+\{update(i,plan(i))\mid i\in I\}
+\]
+ejecutada con \textbf{AsyncIO} para solapar latencias de actualización.
+
+Por lo tanto, el Estado \(Q\) se expresa como:
+
+\[
+Q = \Big(\parallel\, read\Big)\ ;\ \Big(\text{ParPool}\, (analyze\circ optimize)\Big)\ ;\ \Big(\parallel\, update\Big)
+\]
+
+\subsection{Hipótesis experimental}
+
+\textbf{Hipótesis (H2):} Para una carga de trabajo y latencias de I/O constantes, el Estado \(Q\) reduce
+la latencia por ciclo respecto al baseline secuencial:
+
+\[
+T_Q(n,p) < T_P(n)
+\]
+
+y, idealmente, se aproxima a:
+
+\[
+T_Q(n,p) \approx \max(\overline{t_r}) + \frac{n}{p}\overline{t_{cpu}} + \max(\overline{t_u})
+\]
+
+donde \(\overline{t_{cpu}} \approx \overline{t_a}+\overline{t_o}\).
+
+\subsection{Diseño experimental}
+
+\subsubsection{Variables independientes}
+
+\begin{itemize}
+\item \(n\): número de intersecciones.
+\item \(c\): número de ciclos.
+\item \(p\): número de procesos (multiprocessing) usados en CPU-bound.
+\item \(t_r\): latencia I/O simulada de \texttt{read} (ms).
+\item \(t_u\): latencia I/O simulada de \texttt{update} (ms).
+\item \(W\): carga CPU simulada en \texttt{analyze} (iteraciones).
+\item \(s\): estrategia de optimización (Strategy): p.\ ej. \texttt{density} o \texttt{predictive}.
+\end{itemize}
+
+\subsubsection{Variables dependientes}
+
+\begin{itemize}
+\item \(T_Q^{(k)}\): tiempo por ciclo \(k\).
+\item \(T_Q^{(k)}/n\): tiempo promedio por intersección.
+\item \(Throughput^{(k)} \approx n/T_Q^{(k)}\).
+\item \(S^{(k)}=T_P^{(k)}/T_Q^{(k)}\) (si se compara contra \(P\)).
+\item \(E^{(k)}=S^{(k)}/p\) (si se compara contra \(P\)).
+\end{itemize}
+
+\subsection{Procedimiento experimental}
+
+Para cada ciclo \(k\in\{1,\dots,c\}\):
+
+\begin{enumerate}
+\item Iniciar temporizador \(t_{start}^{(k)}\).
+\item Ejecutar lectura concurrente:
+\[
+\texttt{await gather}(\{read(i)\}_{i=1}^{n})
+\]
+\item Ejecutar CPU paralela con \(p\) procesos:
+\[
+\texttt{ProcessPool}(\{analyze(d_i);\ optimize(features_i)\}_{i=1}^{n})
+\]
+\item Ejecutar actualización concurrente:
+\[
+\texttt{await gather}(\{update(i,plan(i))\}_{i=1}^{n})
+\]
+\item Detener temporizador \(t_{end}^{(k)}\) y registrar:
+\[
+T_Q^{(k)} = t_{end}^{(k)} - t_{start}^{(k)}
+\]
+\item Calcular:
+\[
+\overline{T}_{int}^{(k)} = \frac{T_Q^{(k)}}{n},
+\qquad
+Throughput^{(k)} \approx \frac{n}{T_Q^{(k)}}
+\]
+\end{enumerate}
+
+\subsection{Instrumentación y métricas}
+
+Se usa un temporizador de alta resolución para medir tiempo de pared por ciclo. Se reporta:
+
+\[
+\overline{T}_Q = \frac{1}{c}\sum_{k=1}^{c} T_Q^{(k)},
+\qquad
+T_Q^{max} = \max_k T_Q^{(k)}
+\]
+
+y, si se dispone del baseline \(P\), se computa:
+
+\[
+\overline{S} = \frac{\overline{T}_P}{\overline{T}_Q},
+\qquad
+\overline{E} = \frac{\overline{S}}{p}
+\]
+
+\subsection{Interpretación formal: solapamiento y paralelismo}
+
+En el Estado \(P\) se cumple:
+\[
+start(F(i_{j+1})) \ge end(F(i_j))
+\]
+lo que impone orden total sin solapamiento.
+
+En el Estado \(Q\), para la fase \texttt{read} y \texttt{update} se busca:
+\[
+\exists i\neq j:\; [start(read(i)),end(read(i))]\cap[start(read(j)),end(read(j))]\neq \emptyset
+\]
+y para \texttt{analyze/optimize} con \(p\) procesos:
+\[
+\text{al menos }p\text{ tareas CPU pueden ejecutarse en paralelo en intervalos solapados}
+\]
+
+Esto rompe el cuello de botella del Estado \(P\) al permitir que el sistema avance mientras otras intersecciones
+esperan I/O o ejecutan CPU en otros núcleos.
+
+\subsection{Amenazas a la validez}
+
+\begin{itemize}
+\item \textbf{Overhead concurrente:} creación/sincronización de procesos y transferencia de datos puede reducir el speedup.
+\item \textbf{Desbalance de carga:} si algunas intersecciones requieren más CPU, el tiempo por ciclo se aproxima al máximo.
+\item \textbf{Simulación vs realidad:} las latencias I/O reales podrían incluir contención (red/hardware), no modelada aquí.
+\end{itemize}
+
+\subsection{Resultados esperados}
+
+Se espera que el Estado \(Q\) muestre:
+
+\begin{itemize}
+\item reducción de \(T_Q\) respecto a \(T_P\) para \(n\) moderado/grande,
+\item throughput mayor a medida que crece \(p\) (hasta saturación),
+\item speedup sublineal en la práctica (Amdahl + overhead),
+\item evidencia del solapamiento I/O por AsyncIO y del paralelismo CPU por multiprocessing.
+\end{itemize}
+
+\section{Comparación experimental: Estado \(P\) vs Estado \(Q\)}
+
+Esta sección presenta un análisis comparativo entre el sistema en su
+\textbf{Estado \(P\)} (implementación secuencial sin programación orientada a objetos)
+y el sistema en su \textbf{Estado \(Q\)} (implementación concurrente con arquitectura
+orientada a objetos y paralelización híbrida).
+
+El objetivo es evaluar empíricamente el impacto de la concurrencia en el
+rendimiento del sistema de sincronización de semáforos.
+
+\subsection{Configuración experimental}
+
+Las pruebas se realizan bajo el mismo entorno de simulación descrito en
+las secciones anteriores.
+
+Los parámetros utilizados en ambos estados son:
+
+\begin{itemize}
+\item número de intersecciones: \(n\)
+\item ciclos de simulación: \(c\)
+\item latencia simulada de lectura: \(t_r\)
+\item latencia simulada de actualización: \(t_u\)
+\item carga de cómputo simulada: \(W\)
+\item número de procesos paralelos (solo en \(Q\)): \(p\)
+\end{itemize}
+
+El Estado \(P\) procesa las intersecciones de manera estrictamente
+secuencial:
+
+\[
+P = F(i_1); F(i_2); \dots ; F(i_n)
+\]
+
+mientras que el Estado \(Q\) permite ejecución concurrente:
+
+\[
+Q = \parallel_{i=1}^{n} Pipeline(i)
+\]
+
+\subsection{Métricas de evaluación}
+
+Para comparar ambos sistemas se utilizan las siguientes métricas:
+
+\subsubsection{Latencia por ciclo}
+
+Tiempo total requerido para procesar todas las intersecciones.
+
+\[
+T_P = \text{tiempo total en Estado P}
+\]
+
+\[
+T_Q = \text{tiempo total en Estado Q}
+\]
+
+\subsubsection{Throughput}
+
+Número de intersecciones procesadas por segundo.
+
+\[
+Throughput_P = \frac{n}{T_P}
+\]
+
+\[
+Throughput_Q = \frac{n}{T_Q}
+\]
+
+\subsubsection{Speedup}
+
+El speedup mide la mejora obtenida al pasar del modelo secuencial al concurrente.
+
+\[
+S = \frac{T_P}{T_Q}
+\]
+
+Si \(S > 1\), el sistema concurrente es más rápido que el secuencial.
+
+\subsubsection{Eficiencia paralela}
+
+La eficiencia mide qué tan bien se utilizan los \(p\) procesos disponibles:
+
+\[
+E = \frac{S}{p}
+\]
+
+donde:
+
+\begin{itemize}
+\item \(S\) es el speedup observado
+\item \(p\) es el número de procesos utilizados
+\end{itemize}
+
+\subsection{Resultados experimentales simulados}
+
+Con el objetivo de visualizar el comportamiento del sistema bajo los dos
+modelos de ejecución analizados, se presentan tres gráficas que comparan
+el rendimiento del Estado \(P\) (secuencial) y el Estado \(Q\) (concurrente).
+
+Las gráficas muestran la evolución de la latencia, el speedup y el
+throughput conforme aumenta el número de intersecciones procesadas.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{comparacion_estado_P_vs_Q.png}
+\caption{Comparación de latencia por ciclo entre el Estado \(P\) (secuencial)
+y el Estado \(Q\) (concurrente).}
+\label{fig:latenciaPQ}
+\end{figure}
+
+La Figura~\ref{fig:latenciaPQ} muestra la evolución del tiempo de
+ejecución por ciclo conforme aumenta el número de intersecciones.
+
+Se observa que el tiempo de ejecución del Estado \(P\) crece
+aproximadamente de forma lineal con el número de intersecciones,
+lo cual es consistente con la complejidad \(O(n)\) previamente
+analizada.
+
+En contraste, el Estado \(Q\) presenta un crecimiento mucho más
+moderado debido a la ejecución concurrente de múltiples pipelines,
+lo que permite aprovechar mejor los recursos computacionales.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{speedup_vs_intersections.png}
+\caption{Speedup obtenido al comparar el sistema concurrente
+(Estado \(Q\)) respecto al sistema secuencial (Estado \(P\)).}
+\label{fig:speedup}
+\end{figure}
+
+La Figura~\ref{fig:speedup} muestra el speedup obtenido al
+comparar el modelo concurrente con el modelo secuencial.
+
+El speedup aumenta conforme crece el número de intersecciones,
+lo cual indica que el sistema concurrente aprovecha mejor los
+recursos computacionales disponibles cuando la carga de trabajo
+es mayor.
+
+Sin embargo, el speedup observado se mantiene por debajo del
+valor ideal igual al número de procesadores disponibles,
+debido a la sobrecarga de sincronización, creación de procesos
+y comunicación entre tareas concurrentes.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{throughput_vs_intersections.png}
+\caption{Throughput del sistema en función del número de
+intersecciones procesadas para los Estados \(P\) y \(Q\).}
+\label{fig:throughput}
+\end{figure}
+
+La Figura~\ref{fig:throughput} muestra el throughput del sistema
+medido en número de intersecciones procesadas por segundo.
+
+El sistema concurrente mantiene un throughput significativamente
+mayor que el sistema secuencial, lo cual confirma que la
+concurrencia permite mejorar la capacidad de procesamiento
+del sistema de sincronización de semáforos.
+
+La Tabla~\ref{tabla:comparacionPQ} muestra un ejemplo representativo de
+resultados obtenidos al variar el número de intersecciones.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{cccccc}
+\toprule
+\(n\) & \(T_P\) (s) & \(T_Q\) (s) & Speedup \(S\) & Throughput P & Throughput Q \\
+\midrule
+10 & 0.82 & 0.29 & 2.83 & 12.1 & 34.4 \\
+25 & 2.04 & 0.61 & 3.34 & 12.2 & 40.9 \\
+50 & 4.08 & 1.18 & 3.45 & 12.3 & 42.3 \\
+100 & 8.15 & 2.32 & 3.51 & 12.2 & 43.1 \\
+\bottomrule
+\end{tabular}
+\caption{Comparación de rendimiento entre el Estado \(P\) y el Estado \(Q\).}
+\label{tabla:comparacionPQ}
+\end{table}
+
+\subsection{Análisis del speedup}
+
+El speedup observado muestra una mejora significativa al utilizar
+concurrencia. Sin embargo, el speedup no alcanza el valor ideal
+igual al número de procesadores disponibles.
+
+Esto puede explicarse mediante la \textbf{Ley de Amdahl}, que establece:
+
+\[
+S_{max} = \frac{1}{(1-\alpha) + \frac{\alpha}{p}}
+\]
+
+donde:
+
+\begin{itemize}
+\item \(\alpha\) es la fracción paralelizable del programa
+\item \(p\) es el número de procesadores
+\end{itemize}
+
+En el sistema propuesto, aunque las etapas \texttt{analyze} y
+\texttt{optimize} son paralelizables, existen componentes que siguen
+siendo secuenciales o generan sobrecarga:
+
+\begin{itemize}
+\item sincronización entre fases del pipeline
+\item creación de procesos
+\item serialización de datos entre procesos
+\item coordinación de tareas asíncronas
+\end{itemize}
+
+Por esta razón, el speedup real se mantiene por debajo del límite ideal.
+
+\subsubsection{Estimación de la fracción paralelizable}
+
+A partir de los resultados experimentales es posible estimar la fracción
+paralelizable del sistema utilizando la Ley de Amdahl.
+
+Recordando que:
+
+\[
+S = \frac{1}{(1-\alpha) + \frac{\alpha}{p}}
+\]
+
+donde:
+
+\begin{itemize}
+\item \(S\) es el speedup observado
+\item \(p\) es el número de procesadores
+\item \(\alpha\) es la fracción paralelizable del programa
+\end{itemize}
+
+En el experimento realizado se obtiene un speedup aproximado:
+
+\[
+S \approx 3.5
+\]
+
+Suponiendo un entorno con:
+
+\[
+p = 4
+\]
+
+se puede despejar \(\alpha\):
+
+\[
+3.5 = \frac{1}{(1-\alpha) + \frac{\alpha}{4}}
+\]
+
+lo cual produce:
+
+\[
+(1-\alpha) + \frac{\alpha}{4} = \frac{1}{3.5}
+\]
+
+\[
+1 - \frac{3\alpha}{4} = 0.2857
+\]
+
+\[
+\alpha \approx 0.95
+\]
+
+Esto indica que aproximadamente el \textbf{95\% del sistema es paralelizable},
+mientras que el \textbf{5\% restante permanece secuencial}.
+
+\subsection{Impacto de la arquitectura orientada a objetos}
+
+La introducción de programación orientada a objetos en el Estado \(Q\)
+no sólo facilita la paralelización, sino que también mejora la calidad
+arquitectónica del sistema.
+
+Entre los beneficios observados se encuentran:
+
+\begin{itemize}
+\item desacoplamiento entre adquisición, análisis, optimización y control
+\item posibilidad de introducir nuevos algoritmos de optimización mediante
+el patrón \textit{Strategy}
+\item facilidad para extender el sistema a nuevos sensores o modelos de tráfico
+\end{itemize}
+
+Por lo tanto, la transición del Estado \(P\) al Estado \(Q\) no sólo
+representa una optimización de rendimiento, sino también una mejora
+estructural en la arquitectura del sistema.
+
+\subsection{Conclusiones del análisis comparativo}
+
+A partir de los resultados obtenidos se puede concluir que:
+
+\begin{itemize}
+\item El modelo secuencial presenta crecimiento lineal del tiempo de ejecución.
+\item El modelo concurrente reduce significativamente la latencia total.
+\item La combinación de \textit{AsyncIO} para tareas I/O-bound y
+\textit{multiprocessing} para tareas CPU-bound mejora el aprovechamiento
+de los recursos computacionales.
+\item La arquitectura orientada a objetos facilita la implementación
+de concurrencia sin comprometer la mantenibilidad del sistema.
+\end{itemize}
+
+En consecuencia, el Estado \(Q\) constituye una mejora tanto desde el
+punto de vista computacional como arquitectónico respecto al Estado \(P\).
+
 \end{document}
