@@ -1,0 +1,286 @@
+\documentclass[12pt]{article}
+
+% Codificación
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+
+% Matemáticas
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+
+% Algoritmos
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Figuras
+\usepackage{graphicx}
+
+% Tablas
+\usepackage{booktabs}
+
+% Control de flotantes
+\usepackage{float}
+
+% Márgenes
+\usepackage{geometry}
+
+% Links
+\usepackage{hyperref}
+
+% Diagramas
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit}
+
+\title{Evaluacion04}
+\date{March 2026}
+
+\begin{document}
+
+% --- Portada ---
+\begin{titlepage}
+\begin{center}
+
+\vspace*{1.5cm}
+
+{\Large \textbf{UNIVERSIDAD POLITÉCNICA DE CHIAPAS}}\\[0.4cm]
+{\large MAESTRÍA EN CIENCIAS E INNOVACIÓN TECNOLÓGICA}
+
+\vspace{2cm}
+
+{\large \textbf{ASIGNATURA}}\\[0.2cm]
+{\large LÓGICA Y PROGRAMACIÓN}
+
+\vspace{1.8cm}
+
+{\Large \textbf{EVALUACIÓN 04}}
+
+\vspace{1.8cm}
+
+{\large \textbf{TRABAJO GRUPAL}}\\[0.2cm]
+
+\vspace{2cm}
+
+{\large \textbf{DOCENTE}}\\[0.2cm]
+{\large DR. HORACIO IRÁN SOLÍS CISNEROS}
+
+\vfill
+
+{\large Tuxtla Gutiérrez, Chiapas\\
+05 de marzo de 2026}
+
+\end{center}
+\end{titlepage}
+
+\section{Introducción}
+
+\subsection{Contexto}
+
+El crecimiento del tráfico vehicular en entornos urbanos representa uno de los principales desafíos para la movilidad en ciudades modernas. En el marco del concepto de \textit{ciudades inteligentes}, los sistemas de control de tráfico buscan mejorar la eficiencia del flujo vehicular mediante el uso de tecnologías de información, sensores y algoritmos de optimización que permitan ajustar dinámicamente los tiempos de los semáforos.
+
+En muchas implementaciones tradicionales, la sincronización de semáforos se realiza mediante algoritmos secuenciales que procesan cada intersección de manera independiente y en orden. Este enfoque simplifica la implementación del sistema, pero introduce limitaciones cuando el número de intersecciones aumenta o cuando se requiere procesar información en tiempo cercano al tiempo real.
+
+En este trabajo se analiza inicialmente el comportamiento de un sistema de sincronización de semáforos bajo un modelo secuencial, denominado \textbf{Estado \(P\)}, con el objetivo de identificar formalmente sus limitaciones computacionales y los cuellos de botella que afectan su rendimiento.
+
+A partir de este análisis, el trabajo plantea posteriormente la construcción de un modelo alternativo, denominado \textbf{Estado \(Q\)}, en el cual el procesamiento de intersecciones puede realizarse mediante mecanismos de concurrencia o paralelización. La comparación entre ambos estados permitirá evaluar el impacto de la concurrencia en el rendimiento y escalabilidad del sistema de sincronización de semáforos.
+
+\subsection{Problema}
+
+Considérese una red urbana compuesta por un conjunto de intersecciones controladas por semáforos:
+
+\[
+I = \{i_1, i_2, ..., i_n\}
+\]
+
+Cada intersección requiere ejecutar una serie de operaciones para determinar el estado del semáforo en cada ciclo de control.
+
+\begin{itemize}
+\item adquisición de datos de tráfico
+\item cálculo de densidad vehicular
+\item determinación del tiempo óptimo del semáforo
+\item actualización del estado del semáforo
+\end{itemize}
+
+Formalmente, para cada intersección \(i\) se define la función de procesamiento:
+
+\[
+F(i) = read(i) \rightarrow compute(i) \rightarrow update(i)
+\]
+
+\subsection{Estado P: Sistema Secuencial}
+
+En el estado inicial del sistema, denominado \(P\), el procesamiento de todas las intersecciones se realiza de forma estrictamente secuencial.
+
+\[
+P = \sum_{i=1}^{n} F(i)
+\]
+
+donde:
+
+\[
+F(i) = read(i) + compute(i) + update(i)
+\]
+
+El tiempo total de ejecución puede aproximarse como:
+
+\[
+T_P = \sum_{i=1}^{n} (t_r + t_c + t_u)
+\]
+
+donde
+
+\begin{itemize}
+\item \(t_r\) tiempo de lectura
+\item \(t_c\) tiempo de cómputo
+\item \(t_u\) tiempo de actualización
+\end{itemize}
+
+Por lo tanto,
+
+\[
+T_P = n(t_r + t_c + t_u)
+\]
+
+lo que implica una complejidad temporal:
+
+\[
+T_P = O(n)
+\]
+
+\subsection{Hipótesis de Complejidad}
+
+El análisis de complejidad permite estimar el comportamiento del sistema conforme aumenta el número de intersecciones en la red de tráfico.
+
+\subsubsection{Complejidad por intersección}
+
+Cada intersección ejecuta el pipeline:
+
+\[
+F(i) = read(i); compute(i); update(i)
+\]
+
+Cada operación tiene un costo constante, por lo que:
+
+\[
+F(i) = O(1)
+\]
+
+\subsubsection{Complejidad del sistema completo}
+
+El sistema procesa \(n\) intersecciones de forma secuencial:
+
+\[
+P = F(i_1); F(i_2); \dots ; F(i_n)
+\]
+
+Por lo tanto:
+
+\[
+T_P = \sum_{i=1}^{n} F(i)
+\]
+
+lo cual produce:
+
+\[
+T_P = O(n)
+\]
+
+\subsubsection{Hipótesis}
+
+Se plantea la siguiente hipótesis de complejidad:
+
+\textbf{Hipótesis:}
+
+Si el sistema de sincronización de semáforos se ejecuta de forma secuencial, entonces el tiempo total de ejecución crecerá linealmente con el número de intersecciones procesadas.
+
+Esto implica que, en redes de tráfico grandes, el sistema puede presentar limitaciones de escalabilidad y tiempos de respuesta elevados.
+
+\subsection{Cuello de botella}
+
+El principal cuello de botella del sistema secuencial radica en que cada intersección debe esperar a que la anterior complete su procesamiento.
+
+Esto implica:
+
+\begin{itemize}
+\item ausencia de paralelismo
+\item bloqueo del flujo de procesamiento
+\item crecimiento lineal del tiempo de ejecución
+\end{itemize}
+
+\subsection{Pregunta de investigación}
+
+A partir de este análisis surge la siguiente pregunta:
+
+\textbf{¿Cómo puede optimizarse el procesamiento del sistema para reducir los tiempos de ejecución del modelo secuencial sin comprometer su corrección funcional?}
+
+\subsection{Especificación formal mediante tripletas de Hoare}
+
+\[
+\{traffic\_data(i)\} \ read(i) \ \{raw\_data(i)\}
+\]
+
+\[
+\{raw\_data(i)\} \ compute(i) \ \{timing(i)\}
+\]
+
+\[
+\{timing(i)\} \ update(i) \ \{light\_state(i)\}
+\]
+
+El pipeline completo se expresa como:
+
+\[
+\{traffic\_data(i)\} \ F(i) \ \{light\_state(i)\}
+\]
+
+y el sistema completo:
+
+\[
+\{TrafficNetwork\} \ P \ \{UpdatedTrafficLights\}
+\]
+
+\subsection{Diagrama del pipeline (composición secuencial)}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  node distance=6mm and 10mm,
+  block/.style={rectangle, draw, rounded corners, align=center, minimum height=9mm, minimum width=22mm},
+  inner/.style={rectangle, draw, rounded corners, align=center, minimum height=6mm, minimum width=16mm},
+  arrow/.style={-Latex, thick},
+  bott/.style={draw, dashed, rounded corners, inner sep=4mm}
+]
+
+\node[inner] (r1) {$read(i_1)$};
+\node[inner, below=of r1] (c1) {$compute(i_1)$};
+\node[inner, below=of c1] (u1) {$update(i_1)$};
+
+\node[bott, fit=(r1)(c1)(u1), label=above:{$F(i_1)$}] (F1) {};
+
+\draw[arrow] (r1) -- (c1);
+\draw[arrow] (c1) -- (u1);
+
+\node[below=10mm of F1] (dots) {$\vdots$};
+
+\node[inner, below=10mm of dots] (rn) {$read(i_n)$};
+\node[inner, below=of rn] (cn) {$compute(i_n)$};
+\node[inner, below=of cn] (un) {$update(i_n)$};
+
+\node[bott, fit=(rn)(cn)(un), label=above:{$F(i_n)$}] (Fn) {};
+
+\draw[arrow] (rn) -- (cn);
+\draw[arrow] (cn) -- (un);
+
+\draw[arrow] (F1.south) -- node[right] {secuencial} (dots);
+\draw[arrow] (dots) -- (Fn.north);
+
+\node[above=6mm of F1] {\textbf{Estado \(P\):} \(P = F(i_1);F(i_2);\dots;F(i_n)\)};
+
+\end{tikzpicture}
+
+\caption{Pipeline secuencial del sistema.}
+\end{figure}
+
+\end{document}
