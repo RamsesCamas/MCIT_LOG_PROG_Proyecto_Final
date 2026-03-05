@@ -95,6 +95,54 @@
 \end{center}
 \end{titlepage}
 
+\section*{Resumen}
+
+La sincronización eficiente de semáforos es un problema central en el
+diseño de sistemas de movilidad para ciudades inteligentes, ya que
+impacta directamente en la congestión vehicular, el consumo energético
+y los tiempos de traslado.
+
+Este trabajo presenta el diseño y evaluación de un sistema de
+optimización de semáforos basado en un modelo de procesamiento por
+pipelines, en el cual cada intersección se procesa mediante una
+secuencia de etapas que incluyen adquisición de datos, análisis de
+tráfico, optimización del plan semafórico y control del estado del
+semáforo.
+
+Inicialmente se modela el sistema en un \textbf{Estado \(P\)},
+correspondiente a una implementación estrictamente secuencial
+sin programación orientada a objetos. Posteriormente se propone una
+reestructuración arquitectónica que conduce al \textbf{Estado \(Q\)},
+en el cual el sistema se implementa mediante programación orientada
+a objetos y ejecución concurrente de múltiples pipelines de
+procesamiento.
+
+La arquitectura propuesta separa responsabilidades mediante módulos
+independientes y aplica principios SOLID junto con patrones de diseño
+como \textit{Strategy} y \textit{Pipeline}, lo cual permite desacoplar
+los algoritmos de optimización del resto del sistema.
+
+Para aprovechar las características de las diferentes tareas del
+pipeline, se emplea un modelo híbrido de concurrencia que combina
+\textit{AsyncIO} para operaciones \textit{I/O-bound} y
+\textit{multiprocessing} para operaciones \textit{CPU-bound}.
+
+Se realiza una evaluación experimental simulada que compara el
+rendimiento entre ambos estados del sistema. Los resultados muestran
+una reducción significativa en la latencia de procesamiento y un
+incremento considerable en el throughput al utilizar concurrencia.
+
+El análisis del speedup observado se interpreta mediante la Ley de
+Amdahl, estimándose una fracción paralelizable cercana al 95\% del
+sistema. Esto confirma que la arquitectura propuesta permite una
+escalabilidad favorable conforme aumenta el número de intersecciones
+procesadas.
+
+Los resultados demuestran que la transición del modelo secuencial al
+modelo concurrente no sólo mejora el rendimiento computacional, sino
+que también fortalece la calidad arquitectónica del sistema al
+favorecer modularidad, extensibilidad y mantenibilidad.
+
 \section{Introducción}
 
 \subsection{Contexto}
@@ -1961,5 +2009,63 @@ de concurrencia sin comprometer la mantenibilidad del sistema.
 
 En consecuencia, el Estado \(Q\) constituye una mejora tanto desde el
 punto de vista computacional como arquitectónico respecto al Estado \(P\).
+
+\section{Conclusiones}
+
+En este trabajo se abordó el problema de optimización de sincronización
+de semáforos en entornos de ciudades inteligentes mediante el diseño
+y evaluación de una arquitectura de procesamiento basada en pipelines.
+
+Inicialmente se analizó el sistema en su \textbf{Estado \(P\)}, una
+implementación secuencial en la cual las intersecciones se procesan
+una tras otra sin paralelismo ni separación modular significativa.
+El análisis de complejidad mostró que el tiempo de ejecución crece
+linealmente con el número de intersecciones, lo cual limita la
+escalabilidad del sistema cuando el tamaño de la red urbana aumenta.
+
+Posteriormente se propuso una transformación arquitectónica hacia
+el \textbf{Estado \(Q\)}, donde el sistema se rediseña utilizando
+programación orientada a objetos y un modelo concurrente de ejecución.
+La descomposición del sistema en módulos independientes permitió
+separar claramente las etapas de adquisición, análisis, optimización
+y control.
+
+La aplicación de principios SOLID y patrones de diseño, en particular
+el patrón \textit{Strategy}, permitió desacoplar los algoritmos de
+optimización del resto del sistema, facilitando la incorporación de
+nuevos enfoques de control semafórico sin modificar la arquitectura
+central.
+
+Para aprovechar las características de cada etapa del pipeline,
+se implementó un modelo híbrido de concurrencia que combina
+\textit{AsyncIO} para operaciones de entrada/salida y
+\textit{multiprocessing} para tareas intensivas en cómputo.
+Esta combinación permite utilizar eficientemente los recursos del
+sistema y reducir el impacto de cuellos de botella.
+
+La evaluación experimental simulada demostró que el modelo concurrente
+reduce significativamente la latencia de procesamiento y aumenta el
+throughput del sistema. El análisis del speedup obtenido, interpretado
+mediante la Ley de Amdahl, indica que aproximadamente el 95\% del
+sistema es paralelizable, lo que explica la mejora sustancial en
+rendimiento observada.
+
+Además de los beneficios en términos de rendimiento, la arquitectura
+propuesta mejora la calidad del software al proporcionar un diseño
+más modular, extensible y mantenible. Esto resulta particularmente
+relevante en aplicaciones de ciudades inteligentes, donde los sistemas
+de control deben evolucionar continuamente para adaptarse a nuevas
+fuentes de datos y algoritmos de optimización.
+
+Como trabajo futuro, se propone extender el modelo para considerar
+dependencias entre intersecciones mediante grafos dinámicos de tráfico
+y aplicar técnicas avanzadas de optimización, como aprendizaje
+automático o control adaptativo basado en predicción de flujos
+vehiculares.
+
+En conjunto, los resultados obtenidos muestran que la combinación de
+programación orientada a objetos, patrones de diseño y concurrencia
+híbrida constituye una estrategia efectiva para construir sistemas
+escalables de gestión de tráfico en entornos urbanos inteligentes.
 
 \end{document}
