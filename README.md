@@ -1,0 +1,3 @@
+# Concurrent Traffic Light Synchronization
+
+Proyecto académico que explora la optimización de un sistema de sincronización de semáforos para ciudades inteligentes utilizando programación concurrente en Python. El objetivo es comparar una implementación secuencial con versiones concurrentes (por ejemplo, threading o multiprocessing) para analizar mejoras en rendimiento y escalabilidad al procesar múltiples intersecciones de tráfico.
