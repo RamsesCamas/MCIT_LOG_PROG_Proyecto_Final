@@ -153,8 +153,8 @@ Librerías utilizadas:
 
 # Contexto Académico
 
-Este proyecto fue desarrollado como parte de un trabajo de **maestría en
-Ingeniería de Software y Sistemas Inteligentes**.
+Este proyecto fue desarrollado como parte de un trabajo de **Maestria en Ciencias
+e Innovacion Tecnologica**.
 
 El trabajo explora temas relacionados con:
 
@@ -162,9 +162,3 @@ El trabajo explora temas relacionados con:
 -   Arquitectura de software
 -   Optimización de tráfico urbano
 -   Sistemas escalables para ciudades inteligentes
-
-------------------------------------------------------------------------
-
-# Autor
-
-Guillermo Tinoco
