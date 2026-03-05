@@ -969,4 +969,266 @@ Modelo predictivo
 \label{fig:uml_clases}
 \end{figure}
 
+\section{Diseño del sistema concurrente}
+
+En esta sección se formaliza el \textbf{Estado \(Q\)} como un sistema concurrente basado en un \textbf{modelo de grafo} y un \textbf{algoritmo concurrente} capaz de procesar múltiples intersecciones en paralelo. El objetivo es reducir la latencia total del ciclo de control, manteniendo la corrección funcional del pipeline:
+\[
+Pipeline(i)= update\big(optimize(analyze(read(i)))\big)
+\]
+y asegurando que cada intersección \(i\) sea procesada con información consistente.
+
+\subsection{Modelo del sistema como grafo dinámico}
+
+La red vial urbana se modela como un grafo dirigido (o no dirigido, según el caso):
+\[
+G_t = (V, E, w_t)
+\]
+donde:
+\begin{itemize}
+\item \(V = I = \{i_1,i_2,\dots,i_n\}\) es el conjunto de intersecciones (nodos).
+\item \(E \subseteq V \times V\) es el conjunto de vialidades que conectan intersecciones (aristas).
+\item \(w_t: E \rightarrow \mathbb{R}^k\) es una función de pesos dependiente del tiempo \(t\), que encapsula variables como flujo, densidad, velocidad promedio o cola vehicular.
+\end{itemize}
+
+\subsubsection{Estado local e información de vecindad}
+
+Cada intersección \(i \in V\) mantiene un estado local:
+\[
+State_t(i) = \langle D_t(i), F_t(i), P_t(i), L_t(i)\rangle
+\]
+donde:
+\begin{itemize}
+\item \(D_t(i)\): datos crudos (sensores/cámaras).
+\item \(F_t(i)\): \textit{features} derivadas (densidad, cola, flujo).
+\item \(P_t(i)\): plan semafórico (tiempos, fases, offsets).
+\item \(L_t(i)\): estado final del semáforo aplicado.
+\end{itemize}
+
+Para capturar interdependencia espacial, se define la vecindad:
+\[
+N(i) = \{ j \in V \mid (i,j)\in E \ \lor\ (j,i)\in E \}
+\]
+y se admite que el optimizador puede usar información extendida:
+\[
+Context_t(i) = \{F_t(i)\} \cup \{F_t(j)\mid j\in N(i)\}
+\]
+
+\subsubsection{Por qué un modelo de grafo}
+
+El grafo es adecuado porque:
+\begin{itemize}
+\item permite representar dependencias entre intersecciones mediante \(E\),
+\item habilita optimización local (por vecindad) sin requerir un optimizador global costoso,
+\item facilita paralelización: cada nodo puede procesarse con un contexto acotado \(N(i)\),
+\item soporta dinámicas temporales con \(w_t\) (\textit{grafo dinámico}).
+\end{itemize}
+
+\subsection{Partición de tareas: I/O-bound vs CPU-bound}
+
+El pipeline por intersección \(i\) se descompone en:
+\[
+F(i) = read(i); \ analyze(i); \ optimize(i); \ update(i)
+\]
+
+\subsubsection{Tareas I/O-bound}
+
+\begin{itemize}
+\item \(\mathbf{read(i)}\): adquisición de datos de sensores/cámaras/red. Dominada por latencia.
+\item \(\mathbf{update(i)}\): envío de comandos a controladores / persistencia / comunicación.
+\end{itemize}
+
+Estas tareas se benefician de \textbf{AsyncIO} (concurrencia cooperativa) porque permiten solapar esperas sin bloquear CPU.
+
+\subsubsection{Tareas CPU-bound}
+
+\begin{itemize}
+\item \(\mathbf{analyze(i)}\): extracción de métricas, agregación, limpieza.
+\item \(\mathbf{optimize(i)}\): cálculo del plan semafórico (heurísticas, modelos, búsqueda local).
+\end{itemize}
+
+Estas tareas se benefician de \textbf{Multiprocessing} cuando el cómputo es intenso, ya que evita la limitación del GIL en Python y explota múltiples núcleos.
+
+\subsection{Elección de modelos concurrentes y justificación}
+
+Se emplean \textbf{al menos 2 de 3} modelos (AsyncIO y Multiprocessing), de acuerdo con la naturaleza de las tareas:
+
+\subsubsection{AsyncIO para I/O-bound}
+
+\textbf{Justificación:} si se tienen \(n\) intersecciones, el tiempo de lectura puede modelarse como:
+\[
+T^{IO}_P = \sum_{i=1}^n t_r(i)
+\]
+Mientras que con AsyncIO (idealmente, si las operaciones son no bloqueantes):
+\[
+T^{IO}_Q \approx \max_{i} \ t_r(i)
+\]
+es decir, se reduce la latencia agregada al solapar esperas.
+
+\subsubsection{Multiprocessing para CPU-bound}
+
+\textbf{Justificación:} el costo computacional agregado secuencial es:
+\[
+T^{CPU}_P = \sum_{i=1}^n \big(t_a(i) + t_o(i)\big)
+\]
+Al distribuir intersecciones entre \(p\) procesos:
+\[
+T^{CPU}_Q \approx \frac{1}{p}\sum_{i=1}^n \big(t_a(i) + t_o(i)\big) + Overhead(p)
+\]
+donde \(Overhead(p)\) incluye serialización y comunicación entre procesos.
+
+\subsubsection{Comparativa breve (por qué no solo Threading)}
+
+\begin{itemize}
+\item \textbf{Threading} es útil si el CPU-bound es mínimo, pero en Python el GIL limita el paralelismo real en cómputo.
+\item Para I/O-bound, Threading funciona, pero AsyncIO ofrece menor sobrecarga en alta concurrencia.
+\item Por ello: \textbf{AsyncIO (I/O)} + \textbf{Multiprocessing (CPU)} es una combinación adecuada.
+\end{itemize}
+
+\subsection{Algoritmo concurrente híbrido (AsyncIO + Multiprocessing)}
+
+Se propone un algoritmo en dos etapas por ciclo \(t\):
+
+\begin{enumerate}
+\item \textbf{Adquisición concurrente (AsyncIO):} obtener \(D_t(i)\) para todas las intersecciones.
+\item \textbf{Procesamiento paralelo (Multiprocessing):} ejecutar \(analyze+optimize\) por intersección, usando el contexto \(Context_t(i)\).
+\item \textbf{Aplicación concurrente (AsyncIO):} ejecutar \(update(i)\) de manera no bloqueante.
+\end{enumerate}
+
+\subsubsection{Especificación formal del ciclo}
+
+Sea \(ReadAll\), \(ComputeAll\), \(UpdateAll\) las transformaciones globales:
+
+\[
+ReadAll(G_t) = \{D_t(i)\}_{i\in V}
+\]
+\[
+ComputeAll(G_t,\{D_t\}) = \{(F_t(i), P_t(i))\}_{i\in V}
+\]
+\[
+UpdateAll(G_t,\{P_t\}) = \{L_t(i)\}_{i\in V}
+\]
+
+Entonces el ciclo completo es:
+
+\[
+Q_t = UpdateAll \circ ComputeAll \circ ReadAll
+\]
+
+\subsubsection{Tripleta de Hoare del ciclo concurrente}
+
+Definiendo como precondición que existe un grafo y sensores disponibles:
+
+\[
+\{G_t \wedge SensorsReady\} \ Q_t \ \{LightsUpdated \wedge ConsistentPlans\}
+\]
+
+y para cada intersección:
+
+\[
+\{D_t(i)\} \ analyze(i)\ \{F_t(i)\}
+\]
+\[
+\{Context_t(i)\} \ optimize(i)\ \{P_t(i)\}
+\]
+\[
+\{P_t(i)\} \ update(i)\ \{L_t(i)\}
+\]
+
+\subsection{Consistencia y condiciones de carrera}
+
+Para evitar condiciones de carrera al usar contexto de vecindad:
+
+\begin{itemize}
+\item Se introduce una \textbf{barrera por ciclo}: primero se calculan todos los \(F_t(i)\) antes de optimizar.
+\item Formalmente, se asegura el invariante:
+\[
+\forall i\in V: optimize(i) \text{ usa } F_t(i) \text{ y } F_t(j) \text{ ya fijados en el ciclo } t
+\]
+\end{itemize}
+
+Esto transforma el problema en una ejecución por fases:
+\[
+Read \Rightarrow Analyze \Rightarrow Optimize \Rightarrow Update
+\]
+donde cada fase puede paralelizarse internamente.
+
+\subsection{Complejidad esperada del algoritmo concurrente}
+
+En el Estado \(P\):
+\[
+T_P \approx \sum_{i=1}^n \big(t_r(i)+t_a(i)+t_o(i)+t_u(i)\big)
+\]
+
+En el Estado \(Q\), separando I/O y CPU:
+
+\[
+T_Q \approx \max_i(t_r(i)) + 
+\frac{1}{p}\sum_{i=1}^n \big(t_a(i)+t_o(i)\big) + 
+\max_i(t_u(i)) + Overhead
+\]
+
+Bajo balance ideal y baja sobrecarga:
+\[
+T_Q = O\left(\max(t_r,t_u) + \frac{n}{p}\right)
+\]
+
+\subsection{Pseudocódigo del algoritmo híbrido}
+
+\begin{algorithm}[H]
+\caption{Ciclo de control concurrente (AsyncIO + Multiprocessing)}
+\begin{algorithmic}[1]
+\State \textbf{Input:} Grafo dinámico \(G_t=(V,E,w_t)\)
+\State \textbf{Output:} Estados de semáforos \(L_t(i)\) actualizados para todo \(i\in V\)
+
+\Statex
+\State \textbf{// Fase 1: Lectura concurrente (I/O-bound)}
+\State \(D_t \gets \textsc{AsyncReadAll}(V)\)
+
+\Statex
+\State \textbf{// Fase 2: Análisis paralelo (CPU-bound)}
+\State \(F_t \gets \textsc{ProcessPoolMap}(\textsc{Analyze}, D_t)\)
+
+\Statex
+\State \textbf{// Construir contexto por vecindad (acotado)}
+\ForAll{\(i \in V\)}
+\State \(Context_t(i) \gets \{F_t(i)\} \cup \{F_t(j)\mid j\in N(i)\}\)
+\EndFor
+
+\Statex
+\State \textbf{// Fase 3: Optimización paralela (CPU-bound)}
+\State \(P_t \gets \textsc{ProcessPoolMap}(\textsc{Optimize}, \{Context_t(i)\}_{i\in V})\)
+
+\Statex
+\State \textbf{// Fase 4: Actualización concurrente (I/O-bound)}
+\State \(\textsc{AsyncUpdateAll}(V, P_t)\)
+
+\State \Return \(\{L_t(i)\}_{i\in V}\)
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Diagrama del sistema concurrente basado en grafo (vista conceptual)}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+node distance=12mm,
+block/.style={rectangle, draw, rounded corners, align=center, minimum width=5.0cm, minimum height=9mm},
+arrow/.style={->, thick}
+]
+\node[block] (g) {Grafo dinámico \(G_t=(V,E,w_t)\)};
+\node[block, below=of g] (read) {Fase 1 (AsyncIO): ReadAll \(\rightarrow \{D_t(i)\}\)};
+\node[block, below=of read] (an) {Fase 2 (Multiprocessing): AnalyzeAll \(\rightarrow \{F_t(i)\}\)};
+\node[block, below=of an] (opt) {Fase 3 (Multiprocessing): OptimizeAll \(\rightarrow \{P_t(i)\}\)};
+\node[block, below=of opt] (upd) {Fase 4 (AsyncIO): UpdateAll \(\rightarrow \{L_t(i)\}\)};
+
+\draw[arrow] (g) -- (read);
+\draw[arrow] (read) -- (an);
+\draw[arrow] (an) -- (opt);
+\draw[arrow] (opt) -- (upd);
+
+\end{tikzpicture}
+\caption{Vista conceptual del algoritmo concurrente: ejecución por fases sobre el grafo dinámico.}
+\label{fig:grafo_concurrente}
+\end{figure}
+
 \end{document}
