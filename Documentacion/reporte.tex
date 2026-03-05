@@ -1,38 +1,60 @@
 \documentclass[12pt]{article}
 
-% Codificación
+%----------------------------
+% Codificación e idioma
+%----------------------------
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[spanish]{babel}
 
+%----------------------------
+% Márgenes
+%----------------------------
+\usepackage[margin=2.5cm]{geometry}
+
+%----------------------------
 % Matemáticas
+%----------------------------
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsfonts}
 
+%----------------------------
+% Figuras y control de flotantes
+%----------------------------
+\usepackage{graphicx}
+\usepackage{float}
+
+%----------------------------
+% Tablas
+%----------------------------
+\usepackage{booktabs}
+
+%----------------------------
 % Algoritmos
+%----------------------------
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 
-% Figuras
-\usepackage{graphicx}
+%----------------------------
+% Enlaces
+%----------------------------
+\usepackage[hidelinks]{hyperref}
 
-% Tablas
-\usepackage{booktabs}
-
-% Control de flotantes
-\usepackage{float}
-
-% Márgenes
-\usepackage{geometry}
-
-% Links
-\usepackage{hyperref}
-
-% Diagramas
+%----------------------------
+% Diagramas (TikZ) - necesario para pipeline y UML
+%----------------------------
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, fit}
+\usetikzlibrary{arrows.meta, positioning, shapes.multipart, matrix, calc, fit, babel}
 
+%----------------------------
+% (Opcional) Mejoras tipográficas
+%----------------------------
+% \usepackage{microtype}
+
+%----------------------------
+% Metadatos del documento
+%----------------------------
 \title{Evaluacion04}
 \date{March 2026}
 
@@ -519,6 +541,432 @@ arrow/.style={-Latex, thick}
 \end{tikzpicture}
 
 \caption{Pipeline concurrente del sistema. Cada intersección se procesa de forma independiente.}
+\end{figure}
+
+%--------------------------------------------------
+%--------------------------------------------------
+\section{Aplicación de Programación Orientada a Objetos}
+
+La transición del Estado \(P\) (ejecución secuencial) al Estado \(Q\) (ejecución concurrente) no debe interpretarse únicamente como un cambio en el modelo de ejecución del sistema, sino como una \textbf{reconfiguración arquitectónica} que permita garantizar propiedades fundamentales del software tales como:
+
+\begin{itemize}
+\item modularidad
+\item extensibilidad
+\item mantenibilidad
+\item bajo acoplamiento
+\item alta cohesión
+\end{itemize}
+
+En sistemas de control urbano a gran escala, como el caso de sincronización de semáforos en redes viales interconectadas, el diseño arquitectónico debe permitir la evolución del sistema sin comprometer su estabilidad estructural. Por esta razón se adopta el paradigma de \textbf{programación orientada a objetos (POO)}, el cual permite encapsular responsabilidades, abstraer comportamientos y desacoplar las decisiones algorítmicas del flujo principal del sistema.
+
+Formalmente, el sistema puede modelarse como una composición de transformaciones funcionales sobre el estado del tráfico:
+
+\[
+System = \langle Acquisition,\ Processing,\ Optimization,\ Control \rangle
+\]
+
+donde cada componente representa una función que transforma el estado del sistema:
+
+\[
+State_{t+1} = Control(Optimization(Processing(Acquisition(State_t))))
+\]
+
+Este modelo funcional permite razonar formalmente sobre la evolución del sistema a lo largo del tiempo.
+
+\subsection{Diseño modular del sistema}
+
+El sistema se estructura siguiendo una arquitectura basada en \textit{pipeline}, donde cada intersección ejecuta una secuencia de transformaciones sobre los datos de tráfico.
+
+Sea:
+
+\[
+F(i) = read(i); \ compute(i); \ update(i)
+\]
+
+donde \(i\) representa una intersección en la red vial.
+
+Cada etapa del pipeline representa una transformación sobre el estado de los datos:
+
+\[
+TrafficData \rightarrow Features \rightarrow SignalPlan \rightarrow LightState
+\]
+
+Esta descomposición funcional permite aislar responsabilidades y facilita el análisis formal del sistema.
+
+Desde el punto de vista arquitectónico, el sistema se divide en cuatro módulos principales:
+
+\begin{itemize}
+
+\item \textbf{Acquisition}
+
+Encargado de obtener información del entorno físico mediante sensores o sistemas de visión computacional.
+
+\item \textbf{Processing}
+
+Realiza la limpieza, agregación y transformación de los datos crudos en métricas significativas.
+
+\item \textbf{Optimization}
+
+Calcula el plan de sincronización de semáforos mediante algoritmos de optimización.
+
+\item \textbf{Control}
+
+Aplica el plan calculado al sistema físico de semáforos.
+
+\end{itemize}
+
+Esta descomposición reduce la complejidad cognitiva del sistema y permite modificar cada componente sin afectar el resto de la arquitectura.
+
+\subsection{Justificación arquitectónica}
+
+La elección de una arquitectura basada en pipeline orientado a objetos se justifica por varias razones.
+
+En primer lugar, el modelo de tráfico urbano presenta una estructura naturalmente secuencial de transformación de datos:
+
+\[
+RawData \rightarrow Features \rightarrow Decisions \rightarrow Actions
+\]
+
+Este tipo de flujo es particularmente adecuado para arquitecturas tipo pipeline.
+
+En segundo lugar, el modelo permite paralelizar fácilmente el procesamiento de múltiples intersecciones:
+
+\[
+Q = \parallel_{i=1}^{n} Pipeline(i)
+\]
+
+lo cual es consistente con el Estado \(Q\) definido previamente.
+
+Comparativamente, otras arquitecturas alternativas presentan limitaciones en este contexto:
+
+\begin{itemize}
+
+\item \textbf{Arquitectura monolítica}
+
+Produce alto acoplamiento entre módulos y dificulta la evolución del sistema.
+
+\item \textbf{Arquitectura basada en eventos}
+
+Introduce complejidad adicional en el manejo de eventos y sincronización.
+
+\item \textbf{Arquitectura de microservicios}
+
+Aunque altamente escalable, introduce sobrecarga de comunicación innecesaria para el contexto local de control de intersecciones.
+
+\end{itemize}
+
+Por lo tanto, la arquitectura pipeline orientada a objetos representa un equilibrio adecuado entre simplicidad estructural y capacidad de escalamiento.
+
+\subsection{Aplicación de principios SOLID}
+
+Para garantizar calidad arquitectónica se aplican principios SOLID.
+
+\subsubsection{Principio de Responsabilidad Única}
+
+Cada clase tiene una única razón para cambiar.
+
+Formalmente:
+
+\[
+Responsibility(Class) = 1
+\]
+
+Esto se refleja en las siguientes clases:
+
+\begin{itemize}
+
+\item \texttt{TrafficSensorReader}
+
+Responsable exclusivamente de la adquisición de datos.
+
+\item \texttt{TrafficAnalyzer}
+
+Responsable de la extracción de métricas.
+
+\item \texttt{ISignalOptimizer}
+
+Encargado de la lógica de optimización.
+
+\item \texttt{TrafficController}
+
+Responsable de aplicar el plan de semáforos.
+
+\end{itemize}
+
+Esta separación evita que modificaciones en una capa propaguen cambios innecesarios al resto del sistema.
+
+\subsubsection{Open/Closed Principle}
+
+El sistema debe ser extensible sin modificar código existente.
+
+Para lograrlo se introduce una abstracción:
+
+\[
+Optimizer \equiv ISignalOptimizer
+\]
+
+Esta interfaz define el contrato de optimización:
+
+\[
+optimize : Features \rightarrow SignalPlan
+\]
+
+Las implementaciones concretas representan estrategias específicas de optimización.
+
+\subsubsection{Dependency Inversion Principle}
+
+Los módulos de alto nivel no dependen de implementaciones concretas sino de abstracciones.
+
+Formalmente:
+
+\[
+TrafficController \rightarrow ISignalOptimizer
+\]
+
+y no
+
+\[
+TrafficController \rightarrow DensityBasedOptimizer
+\]
+
+Esto permite intercambiar algoritmos sin modificar el controlador del sistema.
+
+\subsection{Justificación del patrón Strategy}
+
+El patrón \textbf{Strategy} se selecciona para encapsular los distintos algoritmos de optimización del tráfico.
+
+Formalmente, el conjunto de estrategias puede modelarse como:
+
+\[
+Strategies = \{S_1, S_2, ..., S_k\}
+\]
+
+donde cada estrategia representa una función:
+
+\[
+S_j : Features \rightarrow SignalPlan
+\]
+
+Ejemplos de estrategias incluyen:
+
+\begin{itemize}
+
+\item optimización basada en densidad vehicular
+\item modelos predictivos de tráfico
+\item algoritmos heurísticos
+\item modelos de aprendizaje automático
+
+\end{itemize}
+
+El patrón Strategy permite seleccionar dinámicamente una estrategia sin modificar la estructura del sistema.
+
+\subsection{Modelo formal del pipeline}
+
+El procesamiento por intersección puede representarse como composición de funciones:
+
+\[
+Pipeline(i) =
+Update \circ Optimize \circ Analyze \circ Read
+\]
+
+lo cual equivale a:
+
+\[
+Pipeline(i) = Update(Optimize(Analyze(Read(i))))
+\]
+
+La ejecución del sistema completo en el modelo concurrente se expresa como:
+
+\[
+Q = \parallel_{i=1}^{n} Pipeline(i)
+\]
+
+Este modelo muestra claramente cómo la arquitectura orientada a objetos facilita la ejecución concurrente.
+
+\subsection{Encapsulación del pipeline}
+
+Cada intersección puede representarse como un objeto compuesto:
+
+\[
+IntersectionPipeline(i) =
+\langle Reader,\ Analyzer,\ Optimizer,\ Controller \rangle
+\]
+
+Este objeto encapsula completamente el flujo de procesamiento de una intersección.
+
+La encapsulación tiene dos ventajas fundamentales:
+
+\begin{itemize}
+
+\item evita interferencia entre pipelines
+\item permite ejecutar múltiples pipelines en paralelo
+
+\end{itemize}
+
+\subsection{Integración con el modelo concurrente}
+
+El diseño orientado a objetos permite integrar de forma natural el modelo concurrente definido anteriormente.
+
+Dado un conjunto de intersecciones:
+
+\[
+I = \{i_1, i_2, ..., i_n\}
+\]
+
+el sistema concurrente se define como:
+
+\[
+Q = \parallel_{i=1}^{n} IntersectionPipeline(i)
+\]
+
+donde cada pipeline opera de manera independiente.
+
+Esta propiedad reduce significativamente la probabilidad de condiciones de carrera y facilita la distribución del trabajo entre múltiples núcleos de procesamiento.
+
+\subsection{Diagrama arquitectónico del sistema}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+node distance=14mm,
+block/.style={rectangle, draw, rounded corners, align=center, minimum width=4.6cm, minimum height=10mm},
+]
+
+\node[block] (sensor) {TrafficSensorReader\\\scriptsize Acquisition};
+\node[block, below=of sensor] (analyzer) {TrafficAnalyzer\\\scriptsize Processing};
+\node[block, below=of analyzer] (optimizer) {ISignalOptimizer (Strategy)\\\scriptsize Optimization};
+\node[block, below=of optimizer] (controller) {TrafficController\\\scriptsize Control};
+
+\draw[->, thick] (sensor) -- (analyzer);
+\draw[->, thick] (analyzer) -- (optimizer);
+\draw[->, thick] (optimizer) -- (controller);
+
+\end{tikzpicture}
+\caption{Arquitectura pipeline por intersección: adquisición, procesamiento, optimización y control.}
+\label{fig:arch_pipeline}
+\end{figure}
+
+\subsection{Diagrama UML de clases}
+
+\begin{figure}[H]
+\centering
+
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+
+% Interface
+\node[
+rectangle split,
+rectangle split parts=2,
+draw,
+dashed,
+rounded corners,
+align=left,
+text width=4.2cm
+] (optimizer) at (0,0)
+{
+\textbf{\textless\textless interface\textgreater\textgreater\ ISignalOptimizer}
+\nodepart{second}
+{\ttfamily + optimize(f: Features): SignalPlan}
+};
+
+% Reader
+\node[
+rectangle split,
+rectangle split parts=3,
+draw,
+rounded corners,
+align=left,
+text width=4.2cm
+] (reader) at (-6,1)
+{
+\textbf{TrafficSensorReader}
+\nodepart{second}
+{\ttfamily + read(i): TrafficData}
+\nodepart{third}
+Adquisición de datos de sensores
+};
+
+% Analyzer
+\node[
+rectangle split,
+rectangle split parts=3,
+draw,
+rounded corners,
+align=left,
+text width=4.2cm
+] (analyzer) at (-6,-2)
+{
+\textbf{TrafficAnalyzer}
+\nodepart{second}
+{\ttfamily + analyze(d): Features}
+\nodepart{third}
+Extracción de métricas
+};
+
+% Controller
+\node[
+rectangle split,
+rectangle split parts=3,
+draw,
+rounded corners,
+align=left,
+text width=4.2cm
+] (controller) at (6,1)
+{
+\textbf{TrafficController}
+\nodepart{second}
+{\ttfamily - optimizer : ISignalOptimizer}
+\nodepart{third}
+{\ttfamily + update(i,plan): LightState}
+};
+
+% Density optimizer
+\node[
+rectangle split,
+rectangle split parts=3,
+draw,
+rounded corners,
+align=left,
+text width=4.2cm
+] (density) at (-3,-4)
+{
+\textbf{DensityBasedOptimizer}
+\nodepart{second}
+{\ttfamily + optimize(f): SignalPlan}
+\nodepart{third}
+Optimización basada en densidad
+};
+
+% Predictive optimizer
+\node[
+rectangle split,
+rectangle split parts=3,
+draw,
+rounded corners,
+align=left,
+text width=4.2cm
+] (predictive) at (3,-4)
+{
+\textbf{PredictiveOptimizer}
+\nodepart{second}
+{\ttfamily + optimize(f): SignalPlan}
+\nodepart{third}
+Modelo predictivo
+};
+
+% Relaciones
+\draw[->, thick] (reader) -- (analyzer);
+\draw[->, thick] (analyzer) -- (optimizer);
+
+\draw[->, dotted, thick] (controller) -- (optimizer);
+
+\draw[->, dashed, thick] (density) -- (optimizer);
+\draw[->, dashed, thick] (predictive) -- (optimizer);
+
+\end{tikzpicture}
+
+\caption{UML de clases: el controlador depende de la abstracción (DIP) y los optimizadores implementan estrategias intercambiables (Strategy).}
+\label{fig:uml_clases}
 \end{figure}
 
 \end{document}
