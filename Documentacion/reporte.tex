@@ -283,4 +283,242 @@ y el sistema completo:
 \caption{Pipeline secuencial del sistema.}
 \end{figure}
 
+\section{Optimización del sistema}
+
+A partir del análisis del Estado \(P\), se observa que el principal problema del sistema radica en la ejecución estrictamente secuencial del pipeline de procesamiento. Esta estructura impide el aprovechamiento de recursos computacionales disponibles, particularmente en sistemas modernos con múltiples núcleos de procesamiento.
+
+Con el objetivo de mejorar el rendimiento del sistema, se analiza la naturaleza de las tareas que componen el pipeline para identificar cuáles pueden beneficiarse de estrategias de concurrencia.
+
+\subsection{Identificación de tareas I/O-bound}
+
+Las tareas \textit{I/O-bound} son aquellas cuyo tiempo de ejecución está dominado por operaciones de entrada/salida, tales como acceso a sensores, lectura de datos o comunicación con dispositivos externos.
+
+En el sistema propuesto, la operación:
+
+\[
+read(i)
+\]
+
+representa la adquisición de datos de tráfico provenientes de sensores o cámaras ubicadas en cada intersección.
+
+Formalmente:
+
+\[
+read : I \rightarrow D
+\]
+
+donde \(D\) representa el conjunto de datos de tráfico capturados por los sensores.
+
+Estas operaciones suelen presentar latencias asociadas al hardware o a la comunicación con dispositivos externos, por lo que múltiples operaciones de lectura pueden ejecutarse de forma concurrente sin interferencia entre sí.
+
+\subsection{Identificación de tareas CPU-bound}
+
+Las tareas \textit{CPU-bound} son aquellas cuyo tiempo de ejecución está dominado por cálculos computacionales.
+
+En el pipeline definido, la operación:
+
+\[
+compute(i)
+\]
+
+corresponde al cálculo del tiempo óptimo del semáforo en la intersección \(i\), considerando variables como:
+
+\begin{itemize}
+\item densidad vehicular
+\item flujo de tráfico
+\item tiempos de espera
+\end{itemize}
+
+Formalmente:
+
+\[
+compute : D \rightarrow T
+\]
+
+donde \(T\) representa el tiempo calculado para el ciclo del semáforo.
+
+Estas operaciones requieren procesamiento intensivo y pueden beneficiarse de paralelización mediante múltiples procesos o hilos de ejecución.
+
+\subsection{Estrategia de paralelización}
+
+Dado que las intersecciones de tráfico pueden procesarse de manera independiente, es posible distribuir el procesamiento de múltiples pipelines entre diferentes unidades de ejecución.
+
+Sea:
+
+\[
+F(i) = read(i); compute(i); update(i)
+\]
+
+En el modelo secuencial:
+
+\[
+P = F(i_1); F(i_2); \dots ; F(i_n)
+\]
+
+En contraste, una estrategia de paralelización permite ejecutar múltiples pipelines simultáneamente:
+
+\[
+Q = \parallel_{i=1}^{n} F(i)
+\]
+
+donde el operador \(\parallel\) representa ejecución concurrente.
+
+Esta transformación permite reducir el tiempo total de ejecución del sistema.
+
+\subsection{Estado Q: Sistema Concurrente}
+
+El Estado \(Q\) representa una versión optimizada del sistema en la cual múltiples intersecciones pueden procesarse simultáneamente.
+
+Formalmente:
+
+\[
+Q = \parallel_{i=1}^{n} (read(i); compute(i); update(i))
+\]
+
+El tiempo de ejecución aproximado se convierte en:
+
+\[
+T_Q \approx \max (t_r + t_c + t_u)
+\]
+
+asumiendo una distribución equilibrada de las tareas entre los recursos disponibles.
+
+Desde la perspectiva de complejidad paralela:
+
+\[
+T_Q = O\left(\frac{n}{p}\right)
+\]
+
+donde \(p\) representa el número de unidades de procesamiento disponibles.
+
+La transformación del sistema puede expresarse formalmente mediante una tripleta de Hoare:
+
+\[
+\{P\} \ OptimizeConcurrency \ \{Q\}
+\]
+
+lo cual indica que el proceso de optimización transforma el sistema secuencial en una versión concurrente manteniendo la corrección funcional.
+
+\subsection{Complejidad del sistema concurrente}
+
+El modelo concurrente del sistema, representado por el Estado \(Q\), permite ejecutar múltiples pipelines de procesamiento de forma simultánea. A diferencia del Estado \(P\), donde cada intersección debe esperar a que la anterior finalice su ejecución, en el modelo concurrente las intersecciones pueden procesarse de manera independiente.
+
+Recordando que el pipeline por intersección se define como:
+
+\[
+F(i) = read(i); compute(i); update(i)
+\]
+
+y que el costo computacional de cada pipeline es constante:
+
+\[
+F(i) = O(1)
+\]
+
+el sistema secuencial se modelaba como:
+
+\[
+P = F(i_1); F(i_2); \dots ; F(i_n)
+\]
+
+lo cual produce una complejidad:
+
+\[
+T_P = O(n)
+\]
+
+En el modelo concurrente, el sistema se transforma en:
+
+\[
+Q = \parallel_{i=1}^{n} F(i)
+\]
+
+donde el operador \(\parallel\) representa ejecución paralela de múltiples pipelines.
+
+Si el sistema dispone de \(p\) unidades de procesamiento, el tiempo de ejecución aproximado puede expresarse como:
+
+\[
+T_Q = O\left(\frac{n}{p}\right)
+\]
+
+donde:
+
+\begin{itemize}
+\item \(n\) es el número de intersecciones
+\item \(p\) es el número de unidades de procesamiento disponibles
+\end{itemize}
+
+Este modelo indica que el tiempo de ejecución del sistema puede reducirse proporcionalmente al número de recursos computacionales utilizados, siempre que el trabajo pueda distribuirse de manera equilibrada.
+
+\subsection{Speedup esperado}
+
+El rendimiento del sistema concurrente puede evaluarse mediante el concepto de \textit{speedup}, definido como:
+
+\[
+S = \frac{T_P}{T_Q}
+\]
+
+Sustituyendo los modelos obtenidos:
+
+\[
+S = \frac{O(n)}{O(n/p)}
+\]
+
+lo cual produce:
+
+\[
+S \approx p
+\]
+
+Este resultado indica que, en condiciones ideales, el sistema concurrente puede alcanzar un speedup cercano al número de procesadores disponibles.
+
+Sin embargo, en la práctica existen factores que limitan el rendimiento, tales como:
+
+\begin{itemize}
+\item sincronización entre procesos
+\item sobrecarga de creación de hilos o procesos
+\item desbalance de carga
+\end{itemize}
+
+Por lo tanto, el speedup real del sistema dependerá de la eficiencia de la estrategia de paralelización utilizada.
+
+\subsection{Diagrama del pipeline concurrente}
+
+El Estado \(Q\) permite que múltiples pipelines de procesamiento se ejecuten simultáneamente, eliminando la dependencia estricta entre intersecciones.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+block/.style={rectangle, draw, rounded corners, align=center, minimum width=2.5cm, minimum height=7mm},
+arrow/.style={-Latex, thick}
+]
+
+\node[block] (r1) {read($i_1$)};
+\node[block, below=of r1] (c1) {compute($i_1$)};
+\node[block, below=of c1] (u1) {update($i_1$)};
+
+\node[block, right=3.5cm of r1] (r2) {read($i_2$)};
+\node[block, below=of r2] (c2) {compute($i_2$)};
+\node[block, below=of c2] (u2) {update($i_2$)};
+
+\node[right=3cm of r2] (dots) {$\cdots$};
+
+\node[block, right=3cm of dots] (rn) {read($i_n$)};
+\node[block, below=of rn] (cn) {compute($i_n$)};
+\node[block, below=of cn] (un) {update($i_n$)};
+
+\draw[arrow] (r1) -- (c1);
+\draw[arrow] (c1) -- (u1);
+
+\draw[arrow] (r2) -- (c2);
+\draw[arrow] (c2) -- (u2);
+
+\draw[arrow] (rn) -- (cn);
+\draw[arrow] (cn) -- (un);
+
+\end{tikzpicture}
+
+\caption{Pipeline concurrente del sistema. Cada intersección se procesa de forma independiente.}
+\end{figure}
+
 \end{document}
