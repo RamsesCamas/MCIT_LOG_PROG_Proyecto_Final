@@ -1,0 +1,204 @@
+\documentclass[12pt]{article}
+
+% Codificación
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+
+% Matemáticas
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+
+% Algoritmos
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Figuras
+\usepackage{graphicx}
+
+% Tablas
+\usepackage{booktabs}
+
+% Control de flotantes
+\usepackage{float}
+
+% Márgenes
+\usepackage{geometry}
+
+% Links
+\usepackage{hyperref}
+
+% Diagramas
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit}
+
+\title{Evaluacion04}
+\date{March 2026}
+
+\begin{document}
+
+% --- Portada ---
+\begin{titlepage}
+\begin{center}
+
+\vspace*{1.5cm}
+
+{\Large \textbf{UNIVERSIDAD POLITÉCNICA DE CHIAPAS}}\\[0.4cm]
+{\large MAESTRÍA EN CIENCIAS E INNOVACIÓN TECNOLÓGICA}
+
+\vspace{2cm}
+
+{\large \textbf{ASIGNATURA}}\\[0.2cm]
+{\large LÓGICA Y PROGRAMACIÓN}
+
+\vspace{1.8cm}
+
+{\Large \textbf{EVALUACIÓN 04}}
+
+\vspace{1.8cm}
+
+{\large \textbf{TRABAJO GRUPAL}}\\[0.2cm]
+
+\vspace{2cm}
+
+{\large \textbf{DOCENTE}}\\[0.2cm]
+{\large DR. HORACIO IRÁN SOLÍS CISNEROS}
+
+\vfill
+
+{\large Tuxtla Gutiérrez, Chiapas\\
+06 de marzo de 2026}
+
+\end{center}
+\end{titlepage}
+
+\section{Introducción}
+
+La optimización del tráfico en el diseño de infraestructuras críticas para Ciudades Inteligentes trasciende la logística convencional para convertirse en un imperativo de estabilidad sistémica y eficiencia económica. Esta introducción establece las bases para modelar la red urbana mediante un formalismo riguroso que permite aislar responsabilidades y escalar el procesamiento.
+
+\subsection{Contexto}
+
+Para abordar la complejidad de las vialidades interconectadas, empleamos el formalismo Cell-DEVS. Este enfoque conceptualiza la red urbana como un \textit{lattice} (malla) de máquinas de estados finitos de $n$ dimensiones. Esta abstracción permite modelar segmentos viales e intersecciones como componentes atómicos con comportamiento discreto y tiempos de transición precisos.
+
+\subsection{Problema}
+
+Una red vial congestionada no es solo un fallo de flujo, sino una manifestación de entropía en un sistema dinámico complejo. Definimos el problema mediante el marco PCQ:
+
+\begin{itemize}
+    \item \textbf{Personas:} Conductores, peatones y gestores de tráfico que requieren predictibilidad total para la toma de decisiones.
+    \item \textbf{Contexto:} Un entorno de celdas interconectadas localmente donde cada nodo es un modelo atómico DEVS. La topología dicta las interacciones espaciales y temporales.
+    \item \textbf{Quejas/Retos:} El desafío central es el Error de Causalidad. En sistemas distribuidos, un Proceso Lógico (LP) podría adelantarse temporalmente a sus vecinos, invalidando la fidelidad de la simulación y la eficacia de las políticas en tiempo real.
+\end{itemize}
+
+\subsection{Estado P: Sistema Secuencial}
+En su estado inicial o monolítico, la ejecución secuencial presenta un crecimiento lineal inmanejable ante redes densas en cuanto a su Tiempo Total ($T$). El procesador único se convierte en un cuello de botella, elevando drásticamente el \textit{Busy Time} (BT) al intentar gestionar todos los eventos.
+
+\subsection{Hipótesis de Complejidad}
+La complejidad del sistema se particiona funcionalmente según la naturaleza de las cargas computacionales.
+
+\subsubsection{Complejidad por intersección (CPU-Bound)}
+El cálculo intensivo ocurre a nivel de nodo físico al resolver el estado de la intersección. Esto depende de:
+\begin{itemize}
+    \item Funciones de Transición Interna ($\delta_{int}$) y Externa ($\delta_{ext}$).
+    \item Funciones de Transición Confluente ($\delta_{con}$) y Transición Local Confluente ($\tau_{con}$), que son críticas para resolver colisiones cuando dos vehículos intentan ocupar la misma celda simultáneamente.
+\end{itemize}
+Estos cálculos consumen ciclos de procesador significativos.
+
+\subsubsection{Complejidad del sistema completo (I/O-Bound)}
+La complejidad a macro-escala radica en la propagación de estados. Bajo protocolos conservadores como CMB, el envío constante de mensajes de sincronización (\textit{Null Messages}) para evitar bloqueos genera un \textit{overhead} de entrada/salida masivo.
+
+
+\subsubsection{Hipótesis}
+
+Se plantea la siguiente hipótesis de complejidad:
+
+\textbf{Hipótesis:}
+
+Implementar una simulación paralela conservadora fundamentada en el protocolo Lower-Bound-Time-Stamp (LBTS) y el algoritmo CMB erradicará el error de causalidad. Al utilizar un mecanismo de \textit{lookahead} derivado matemáticamente de la función de duración ($D$) del estado, las intersecciones vecinas podrán avanzar sus relojes lógicos de forma segura, maximizando el paralelismo y reduciendo la frecuencia de sincronización global.
+
+\subsection{Cuello de botella}
+
+La identificación de cargas confirma que el cuello de botella principal no es el cálculo semafórico \textit{per se}, sino el intercambio de mensajes entre Procesos Lógicos (LPs) que satura los buses de comunicación y limita el escalamiento.
+
+Bajo protocolos conservadores como CMB, el envío constante de mensajes de sincronización (\textit{Null Messages}) para evitar bloqueos genera un \textit{overhead} masivo de entrada/salida que penaliza drásticamente la latencia total del sistema, denotada como $T$.
+
+Para erradicar esta saturación y escalar la red urbana, el diseño arquitectónico aborda el problema en tres dimensiones fundamentales:
+
+\begin{enumerate}
+    \item \textbf{Mitigación Algorítmica mediante Lookahead ($L$):} \\
+    La dependencia temporal estricta en simulaciones conservadoras genera una densidad de mensajería insostenible. Para resolverlo, el sistema implementa un mecanismo de \textit{lookahead} derivado matemáticamente de la función de duración ($D$) del estado de la celda. Formalmente, si un estado semafórico (ej. fase roja) garantiza una permanencia mínima sin transiciones, el sistema asume un horizonte temporal seguro $L \ge D$. Esto permite a los LPs vecinos avanzar sus relojes lógicos de forma asíncrona dentro de esa ventana $D$, suprimiendo la necesidad de enviar \textit{Null Messages} de validación cruzada y estabilizando el \textit{Null Message Ratio} (NMR) a macro-escala.
+
+    \item \textbf{Topología de Enrutamiento (Flat Coordinator):} \\
+    La topología de red estándar introduce latencia al pasar mensajes a través de múltiples capas. Al adoptar una arquitectura de \textit{Flat Coordinator} (FC), el sistema elimina el \textit{overhead} de procesamiento que introducen los coordinadores intermedios. Esto colapsa la jerarquía del árbol de procesos, permitiendo una comunicación horizontal directa y altamente eficiente de los mensajes de control ($\ast, x, y, @, D$) entre el simulador local y la red.
+
+    \item \textbf{Desacoplamiento Físico y Memoria Compartida:} \\
+    Finalmente, para evitar que la serialización de datos se convierta en un micro-cuello de botella interno, se aísla el motor de cálculo matemático (multiprocesamiento para tareas \textit{CPU-bound}) del bucle de gestión de red (E/S asíncrona). En lugar de utilizar canales de comunicación estándar entre procesos (IPC), el modelo atómico escribe las matrices de estado vehicular directamente en bloques de memoria compartida. El gestor asíncrono lee esta memoria a velocidad de hardware para empaquetar y propagar los datos. Paralelamente, una recolección estricta de telemetría mide la consistencia y las latencias de red en tiempo real, asegurando que las fluctuaciones en la transmisión no corrompan la integridad causal del protocolo LBTS.
+\end{enumerate}
+
+\subsection{Pregunta de investigación}
+
+A partir de este análisis surge la siguiente pregunta:
+
+\textbf{¿De qué manera una arquitectura basada en Parallel Cell-DEVS con un diseño de Flat Coordinator y un mecanismo de \textit{lookahead} optimizado puede mitigar el impacto de las tareas I/O-bound (distribución de Null Messages) garantizando la integridad causal en la sincronización de semáforos a escala urbana?}
+
+\subsection{Especificación formal mediante tripletas de Hoare}
+
+Para formalizar la garantía de sincronización y evitar el Error de Causalidad, empleamos la lógica de Hoare $\{P\} \ C \ \{Q\}$:
+
+\begin{itemize}
+    \item \textbf{Precondición $\{P\}$:} 
+    $$ \forall \ LP_i, LP_j \in \text{Red}, \ \text{Reloj}(LP_i) \neq \text{Reloj}(LP_j) $$
+    Existe el riesgo de que un mensaje enviado por $LP_j$ en el tiempo $t_1$ llegue a $LP_i$ cuando el reloj local de $LP_i$ ya está en $t_2$, donde $t_2 > t_1$ (Error de causalidad).
+    
+    \item \textbf{Comando $\{C\}$:} Ejecución del simulador con protocolo LBTS y cálculo de Lookahead $L \ge D$.
+    
+    \item \textbf{Postcondición $\{Q\}$:} 
+    $$ \forall \ \text{mensaje } m \text{ recibido por } LP_i, \ t(m) \ge \text{Reloj}(LP_i) $$
+    Se garantiza la integridad causal del sistema y el NMR (\textit{Null Message Ratio}) tiende a estabilizarse.
+\end{itemize}
+
+\subsection{Diagrama del pipeline (composición secuencial)}
+
+\subsection{Diagrama del pipeline}
+Siguiendo el Principio de Responsabilidad Única (SRP), el \textit{pipeline} del sistema se estructura de la siguiente manera:
+
+\vspace{0.5cm}
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=1cm and 1cm,
+    box/.style={draw, rectangle, rounded corners, minimum width=4cm, minimum height=1.5cm, align=center, font=\sffamily\small, fill=blue!5},
+    arrow/.style={-{Stealth[length=3mm]}, thick, draw=black!75}
+]
+
+% Nodos principales (Flujo Vertical)
+\node[box, fill=green!10] (model) {\textbf{Traffic Light Model}\\Mantiene definición formal\\($S, \delta_{int}, \delta_{ext}, \delta_{con}$)};
+\node[box, fill=orange!10, below=of model] (engine) {\textbf{Multiprocessing Engine}\\Ejecuta transiciones $\delta$\\ (Aislamiento CPU-bound)};
+\node[box, fill=purple!10, below=of engine] (comm) {\textbf{Communication Manager}\\Enrutamiento local\\(Flat Coordinator)};
+\node[box, fill=cyan!10, below=of comm] (async) {\textbf{AsyncIO Event Loop}\\Flujo de sincronización LBTS\\(Gestión I/O-bound)};
+
+% Nodo lateral (Métricas)
+\node[box, fill=yellow!10, right=of comm, xshift=1cm] (metrics) {\textbf{Metrics Collector}\\Recolección asíncrona\\(Busy Time, NMR)};
+
+% Conexiones
+\draw[arrow] (model) -- (engine);
+\draw[arrow] (engine) -- (comm);
+\draw[arrow] (comm) -- (async);
+\draw[arrow, dashed] (comm) -- (metrics) node[midway, above, font=\scriptsize] {Datos};
+\draw[arrow, dashed] (async.east) -| (metrics.south) node[near start, below, font=\scriptsize] {Eventos};
+
+\end{tikzpicture}
+\end{center}
+
+\vspace{0.5cm}
+
+\begin{itemize}
+    \item \textbf{Traffic Light Model:} Mantiene la definición formal del modelo atómico (estados $S$, funciones $\delta_{int}$, $\delta_{ext}$, $\delta_{con}$).
+    \item \textbf{Multiprocessing Engine:} Ejecuta las funciones de transición aislando los núcleos de CPU para tareas puramente algorítmicas.
+    \item \textbf{Communication Manager:} Integra el enrutamiento local mediante el Flat Coordinator (FC) para eliminar el \textit{overhead} de coordinadores intermedios.
+    \item \textbf{AsyncIO Event Loop:} Gestiona asíncronamente el flujo masivo de mensajes de sincronización (tareas I/O-bound) y el protocolo LBTS.
+    \item \textbf{Metrics Collector:} Realiza la recolección asíncrona de métricas (Busy Time, NMR, uso de memoria) sin afectar la lógica principal.
+\end{itemize}
+
+\end{document}
