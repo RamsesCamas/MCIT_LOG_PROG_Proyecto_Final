@@ -1,80 +1,95 @@
-# Optimización Concurrente de Semáforos para Ciudades Inteligentes
+# Optimización Concurrente de Sincronización de Semáforos
 
-## Descripción
+Proyecto desarrollado para la materia **Lógica y Programación** del
+programa de **Maestría en Ciencias e Innovación Tecnológica (MCIT)**.
 
-Este repositorio contiene la implementación y evaluación experimental de
-un sistema de sincronización de semáforos diseñado para entornos de
-**ciudades inteligentes**.
+El objetivo del proyecto es modelar y optimizar un sistema de
+sincronización de semáforos utilizando **programación concurrente**,
+**arquitectura orientada a objetos** y **patrones de diseño**, evaluando
+el rendimiento frente a una implementación secuencial.
 
-El proyecto analiza dos estados arquitectónicos del sistema:
+------------------------------------------------------------------------
 
--   **Estado P** --- Implementación secuencial sin programación
-    orientada a objetos
--   **Estado Q** --- Implementación concurrente con arquitectura
-    orientada a objetos
+# Problema
 
-El objetivo principal es analizar cómo la **concurrencia y el diseño
-modular** pueden mejorar el rendimiento y la escalabilidad de sistemas
-de control de tráfico.
+En sistemas de control de tráfico urbano, múltiples intersecciones deben
+procesar información de sensores, analizar el estado del tráfico y
+calcular planes semafóricos en tiempo real.
+
+Un enfoque completamente secuencial provoca:
+
+-   aumento lineal del tiempo de procesamiento
+-   baja escalabilidad
+-   incapacidad para responder a redes urbanas grandes
+
+Para resolver esto se propone una arquitectura concurrente basada en
+**pipelines independientes por intersección**.
 
 ------------------------------------------------------------------------
 
 # Arquitectura del Sistema
 
-El sistema modela cada intersección como un **pipeline de
-procesamiento** compuesto por cuatro etapas:
+Cada intersección se procesa mediante un **pipeline de cuatro etapas**:
 
-1.  **Adquisición de datos**
-2.  **Procesamiento**
-3.  **Optimización**
-4.  **Control**
+Read → Analyze → Optimize → Update
 
 Formalmente:
 
 Pipeline(i) = Update( Optimize( Analyze( Read(i) )))
 
-Cada intersección puede procesarse de manera independiente, lo cual
-permite paralelizar el sistema.
+donde:
+
+-   **Read**: adquisición de datos de sensores
+-   **Analyze**: procesamiento de métricas de tráfico
+-   **Optimize**: cálculo del plan semafórico
+-   **Update**: actualización del estado del semáforo
+
+Cada intersección puede procesarse de manera independiente, permitiendo
+paralelización.
 
 ------------------------------------------------------------------------
 
-# Estado P --- Sistema Secuencial
+# Arquitectura de Software
 
-El **Estado P** representa la implementación base del sistema.
+El sistema está organizado siguiendo principios de **programación
+orientada a objetos** y **arquitectura modular**.
 
-Características:
+Componentes principales:
 
--   Ejecución completamente secuencial
--   Sin uso de programación orientada a objetos
--   Pipeline implementado de forma procedural
-
-Modelo de ejecución:
-
-P = F(i1); F(i2); ... ; F(in)
-
-Limitaciones:
-
--   Crecimiento lineal del tiempo de ejecución
--   Baja escalabilidad
--   Dificultad para extender el sistema
+-   Acquisition --- lectura de sensores
+-   Processing --- análisis del estado del tráfico
+-   Optimization --- cálculo de planes semafóricos
+-   Control --- aplicación del plan calculado
 
 ------------------------------------------------------------------------
 
-# Estado Q --- Sistema Concurrente
+# Patrones de Diseño Utilizados
 
-El **Estado Q** introduce una arquitectura orientada a objetos junto con
-concurrencia.
+## Strategy Pattern
 
-## Patrones de Diseño Utilizados
+Permite intercambiar algoritmos de optimización sin modificar el resto
+del sistema.
 
--   **Strategy Pattern** --- Permite intercambiar algoritmos de
-    optimización
--   **Pipeline Pattern** --- Define el flujo de procesamiento del
-    sistema
+ISignalOptimizer\
+├── DensityBasedOptimizer\
+└── PredictiveOptimizer
 
-## Modelo de Concurrencia
+Esto facilita incorporar nuevos algoritmos de control de tráfico.
 
-El sistema utiliza un enfoque híbrido:
+------------------------------------------------------------------------
+
+## Pipeline Pattern
+
+El sistema modela el procesamiento de cada intersección como una
+secuencia de transformaciones.
+
+TrafficData → Features → SignalPlan → LightState
+
+------------------------------------------------------------------------
+
+# Concurrencia
+
+El sistema utiliza un modelo **híbrido de concurrencia**:
 
   Tipo de tarea   Tecnología
   --------------- -----------------
@@ -85,80 +100,86 @@ Esto permite aprovechar mejor los recursos del sistema.
 
 ------------------------------------------------------------------------
 
-# Evaluación Experimental
-
-El repositorio incluye un conjunto de experimentos simulados que
-comparan el rendimiento entre el **Estado P** y el **Estado Q**.
-
-Las métricas evaluadas incluyen:
-
--   Latencia de procesamiento
--   Throughput
--   Speedup
--   Eficiencia paralela
-
-Los resultados muestran mejoras significativas en rendimiento al
-utilizar concurrencia.
-
-------------------------------------------------------------------------
-
-# Análisis con la Ley de Amdahl
-
-El speedup observado fue analizado utilizando la **Ley de Amdahl**:
-
-S = 1 / ((1 - α) + α / p)
-
-Los resultados experimentales sugieren:
-
-α ≈ 0.95
-
-Esto indica que aproximadamente **el 95% del sistema es paralelizable**.
-
-------------------------------------------------------------------------
-
 # Estructura del Proyecto
 
-traffic_sync_project/ │ ├── estado_p/ │ ├── main.py │ ├── simulacion.py
-│ └── modelo_trafico.py │ ├── estado_q/ │ ├── main.py │ ├── pipeline/ │
-├── optimizadores/ │ ├── concurrencia/ │ └── controlador/ │ ├──
-experimentos/ │ ├── benchmark.py │ ├── graficas.py │ └── resultados/ │
-└── docs/ └── reporte_evaluacion.pdf
+    MCIT_LOG_PROG_Proyecto_Final/
+    │
+    ├── CodigoConcurrente/
+    │   ├── src/
+    │   │   ├── acquisition.py
+    │   │   ├── processing.py
+    │   │   ├── control.py
+    │   │   ├── pipeline.py
+    │   │   ├── workers.py
+    │   │   ├── orchestrator_q.py
+    │   │   ├── config.py
+    │   │   ├── domain.py
+    │   │   ├── main.py
+    │   │   │
+    │   │   └── optimization/
+    │   │       ├── interfaces.py
+    │   │       ├── strategies.py
+    │   │       ├── factory.py
+    │   │       └── impl.py
+    │
+    ├── Documentacion/
+    │   ├── reporte.tex
+    │   ├── speedup_vs_intersections.png
+    │   └── throughput_vs_intersections.png
 
 ------------------------------------------------------------------------
 
 # Ejecución
 
-Versión secuencial:
+Para ejecutar el sistema:
 
-python estado_p/main.py
-
-Versión concurrente:
-
-python estado_q/main.py
+    cd CodigoConcurrente/src
+    python main.py
 
 ------------------------------------------------------------------------
 
-# Requisitos
+# Evaluación Experimental
 
-Python 3.10 o superior
+El proyecto incluye una evaluación simulada que compara:
 
-Librerías utilizadas:
+-   latencia de procesamiento
+-   throughput
+-   speedup
+-   eficiencia paralela
 
--   numpy
--   matplotlib
--   asyncio
--   multiprocessing
+Resultados principales:
+
+-   reducción significativa de latencia
+-   incremento del throughput
+-   speedup cercano a **3.5×**
 
 ------------------------------------------------------------------------
 
-# Contexto Académico
+# Análisis con la Ley de Amdahl
 
-Este proyecto fue desarrollado como parte de un trabajo de **Maestria en Ciencias
-e Innovacion Tecnologica**.
+El speedup observado se explica mediante:
 
-El trabajo explora temas relacionados con:
+S = 1 / ((1 − α) + α/p)
 
--   Programación concurrente
--   Arquitectura de software
--   Optimización de tráfico urbano
--   Sistemas escalables para ciudades inteligentes
+Resultados experimentales:
+
+α ≈ 0.95
+
+Esto indica que aproximadamente **95% del sistema es paralelizable**.
+
+------------------------------------------------------------------------
+
+# Tecnologías Utilizadas
+
+-   Python 3
+-   AsyncIO
+-   Multiprocessing
+-   Programación Orientada a Objetos
+-   Patrones de diseño
+
+------------------------------------------------------------------------
+
+# Autor
+
+Guillermo Tinoco\
+Maestría en Ciencias e Innovación Tecnológica
