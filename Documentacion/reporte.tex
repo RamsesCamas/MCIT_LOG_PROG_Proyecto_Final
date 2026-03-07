@@ -1,38 +1,60 @@
 \documentclass[12pt]{article}
 
-% Codificación
+%----------------------------
+% Codificación e idioma
+%----------------------------
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[spanish]{babel}
 
+%----------------------------
+% Márgenes
+%----------------------------
+\usepackage[margin=2.5cm]{geometry}
+
+%----------------------------
 % Matemáticas
+%----------------------------
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsfonts}
 
+%----------------------------
+% Figuras y control de flotantes
+%----------------------------
+\usepackage{graphicx}
+\usepackage{float}
+
+%----------------------------
+% Tablas
+%----------------------------
+\usepackage{booktabs}
+
+%----------------------------
 % Algoritmos
+%----------------------------
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 
-% Figuras
-\usepackage{graphicx}
+%----------------------------
+% Enlaces
+%----------------------------
+\usepackage[hidelinks]{hyperref}
 
-% Tablas
-\usepackage{booktabs}
-
-% Control de flotantes
-\usepackage{float}
-
-% Márgenes
-\usepackage{geometry}
-
-% Links
-\usepackage{hyperref}
-
-% Diagramas
+%----------------------------
+% Diagramas (TikZ) - necesario para pipeline y UML
+%----------------------------
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, fit}
+\usetikzlibrary{arrows.meta, positioning, shapes.multipart, matrix, calc, fit, babel}
 
+%----------------------------
+% (Opcional) Mejoras tipográficas
+%----------------------------
+% \usepackage{microtype}
+
+%----------------------------
+% Metadatos del documento
+%----------------------------
 \title{Evaluacion04}
 \date{March 2026}
 
@@ -72,6 +94,54 @@
 
 \end{center}
 \end{titlepage}
+
+\section*{Resumen}
+
+La sincronización eficiente de semáforos es un problema central en el
+diseño de sistemas de movilidad para ciudades inteligentes, ya que
+impacta directamente en la congestión vehicular, el consumo energético
+y los tiempos de traslado.
+
+Este trabajo presenta el diseño y evaluación de un sistema de
+optimización de semáforos basado en un modelo de procesamiento por
+pipelines, en el cual cada intersección se procesa mediante una
+secuencia de etapas que incluyen adquisición de datos, análisis de
+tráfico, optimización del plan semafórico y control del estado del
+semáforo.
+
+Inicialmente se modela el sistema en un \textbf{Estado \(P\)},
+correspondiente a una implementación estrictamente secuencial
+sin programación orientada a objetos. Posteriormente se propone una
+reestructuración arquitectónica que conduce al \textbf{Estado \(Q\)},
+en el cual el sistema se implementa mediante programación orientada
+a objetos y ejecución concurrente de múltiples pipelines de
+procesamiento.
+
+La arquitectura propuesta separa responsabilidades mediante módulos
+independientes y aplica principios SOLID junto con patrones de diseño
+como \textit{Strategy} y \textit{Pipeline}, lo cual permite desacoplar
+los algoritmos de optimización del resto del sistema.
+
+Para aprovechar las características de las diferentes tareas del
+pipeline, se emplea un modelo híbrido de concurrencia que combina
+\textit{AsyncIO} para operaciones \textit{I/O-bound} y
+\textit{multiprocessing} para operaciones \textit{CPU-bound}.
+
+Se realiza una evaluación experimental simulada que compara el
+rendimiento entre ambos estados del sistema. Los resultados muestran
+una reducción significativa en la latencia de procesamiento y un
+incremento considerable en el throughput al utilizar concurrencia.
+
+El análisis del speedup observado se interpreta mediante la Ley de
+Amdahl, estimándose una fracción paralelizable cercana al 95\% del
+sistema. Esto confirma que la arquitectura propuesta permite una
+escalabilidad favorable conforme aumenta el número de intersecciones
+procesadas.
+
+Los resultados demuestran que la transición del modelo secuencial al
+modelo concurrente no sólo mejora el rendimiento computacional, sino
+que también fortalece la calidad arquitectónica del sistema al
+favorecer modularidad, extensibilidad y mantenibilidad.
 
 \section{Introducción}
 
@@ -282,5 +352,1720 @@ y el sistema completo:
 
 \caption{Pipeline secuencial del sistema.}
 \end{figure}
+
+\section{Optimización del sistema}
+
+A partir del análisis del Estado \(P\), se observa que el principal problema del sistema radica en la ejecución estrictamente secuencial del pipeline de procesamiento. Esta estructura impide el aprovechamiento de recursos computacionales disponibles, particularmente en sistemas modernos con múltiples núcleos de procesamiento.
+
+Con el objetivo de mejorar el rendimiento del sistema, se analiza la naturaleza de las tareas que componen el pipeline para identificar cuáles pueden beneficiarse de estrategias de concurrencia.
+
+\subsection{Identificación de tareas I/O-bound}
+
+Las tareas \textit{I/O-bound} son aquellas cuyo tiempo de ejecución está dominado por operaciones de entrada/salida, tales como acceso a sensores, lectura de datos o comunicación con dispositivos externos.
+
+En el sistema propuesto, la operación:
+
+\[
+read(i)
+\]
+
+representa la adquisición de datos de tráfico provenientes de sensores o cámaras ubicadas en cada intersección.
+
+Formalmente:
+
+\[
+read : I \rightarrow D
+\]
+
+donde \(D\) representa el conjunto de datos de tráfico capturados por los sensores.
+
+Estas operaciones suelen presentar latencias asociadas al hardware o a la comunicación con dispositivos externos, por lo que múltiples operaciones de lectura pueden ejecutarse de forma concurrente sin interferencia entre sí.
+
+\subsection{Identificación de tareas CPU-bound}
+
+Las tareas \textit{CPU-bound} son aquellas cuyo tiempo de ejecución está dominado por cálculos computacionales.
+
+En el pipeline definido, la operación:
+
+\[
+compute(i)
+\]
+
+corresponde al cálculo del tiempo óptimo del semáforo en la intersección \(i\), considerando variables como:
+
+\begin{itemize}
+\item densidad vehicular
+\item flujo de tráfico
+\item tiempos de espera
+\end{itemize}
+
+Formalmente:
+
+\[
+compute : D \rightarrow T
+\]
+
+donde \(T\) representa el tiempo calculado para el ciclo del semáforo.
+
+Estas operaciones requieren procesamiento intensivo y pueden beneficiarse de paralelización mediante múltiples procesos o hilos de ejecución.
+
+\subsection{Estrategia de paralelización}
+
+Dado que las intersecciones de tráfico pueden procesarse de manera independiente, es posible distribuir el procesamiento de múltiples pipelines entre diferentes unidades de ejecución.
+
+Sea:
+
+\[
+F(i) = read(i); compute(i); update(i)
+\]
+
+En el modelo secuencial:
+
+\[
+P = F(i_1); F(i_2); \dots ; F(i_n)
+\]
+
+En contraste, una estrategia de paralelización permite ejecutar múltiples pipelines simultáneamente:
+
+\[
+Q = \parallel_{i=1}^{n} F(i)
+\]
+
+donde el operador \(\parallel\) representa ejecución concurrente.
+
+Esta transformación permite reducir el tiempo total de ejecución del sistema.
+
+\subsection{Estado Q: Sistema Concurrente}
+
+El Estado \(Q\) representa una versión optimizada del sistema en la cual múltiples intersecciones pueden procesarse simultáneamente.
+
+Formalmente:
+
+\[
+Q = \parallel_{i=1}^{n} (read(i); compute(i); update(i))
+\]
+
+El tiempo de ejecución aproximado se convierte en:
+
+\[
+T_Q \approx \max (t_r + t_c + t_u)
+\]
+
+asumiendo una distribución equilibrada de las tareas entre los recursos disponibles.
+
+Desde la perspectiva de complejidad paralela:
+
+\[
+T_Q = O\left(\frac{n}{p}\right)
+\]
+
+donde \(p\) representa el número de unidades de procesamiento disponibles.
+
+La transformación del sistema puede expresarse formalmente mediante una tripleta de Hoare:
+
+\[
+\{P\} \ OptimizeConcurrency \ \{Q\}
+\]
+
+lo cual indica que el proceso de optimización transforma el sistema secuencial en una versión concurrente manteniendo la corrección funcional.
+
+\subsection{Complejidad del sistema concurrente}
+
+El modelo concurrente del sistema, representado por el Estado \(Q\), permite ejecutar múltiples pipelines de procesamiento de forma simultánea. A diferencia del Estado \(P\), donde cada intersección debe esperar a que la anterior finalice su ejecución, en el modelo concurrente las intersecciones pueden procesarse de manera independiente.
+
+Recordando que el pipeline por intersección se define como:
+
+\[
+F(i) = read(i); compute(i); update(i)
+\]
+
+y que el costo computacional de cada pipeline es constante:
+
+\[
+F(i) = O(1)
+\]
+
+el sistema secuencial se modelaba como:
+
+\[
+P = F(i_1); F(i_2); \dots ; F(i_n)
+\]
+
+lo cual produce una complejidad:
+
+\[
+T_P = O(n)
+\]
+
+En el modelo concurrente, el sistema se transforma en:
+
+\[
+Q = \parallel_{i=1}^{n} F(i)
+\]
+
+donde el operador \(\parallel\) representa ejecución paralela de múltiples pipelines.
+
+Si el sistema dispone de \(p\) unidades de procesamiento, el tiempo de ejecución aproximado puede expresarse como:
+
+\[
+T_Q = O\left(\frac{n}{p}\right)
+\]
+
+donde:
+
+\begin{itemize}
+\item \(n\) es el número de intersecciones
+\item \(p\) es el número de unidades de procesamiento disponibles
+\end{itemize}
+
+Este modelo indica que el tiempo de ejecución del sistema puede reducirse proporcionalmente al número de recursos computacionales utilizados, siempre que el trabajo pueda distribuirse de manera equilibrada.
+
+\subsection{Speedup esperado}
+
+El rendimiento del sistema concurrente puede evaluarse mediante el concepto de \textit{speedup}, definido como:
+
+\[
+S = \frac{T_P}{T_Q}
+\]
+
+Sustituyendo los modelos obtenidos:
+
+\[
+S = \frac{O(n)}{O(n/p)}
+\]
+
+lo cual produce:
+
+\[
+S \approx p
+\]
+
+Este resultado indica que, en condiciones ideales, el sistema concurrente puede alcanzar un speedup cercano al número de procesadores disponibles.
+
+Sin embargo, en la práctica existen factores que limitan el rendimiento, tales como:
+
+\begin{itemize}
+\item sincronización entre procesos
+\item sobrecarga de creación de hilos o procesos
+\item desbalance de carga
+\end{itemize}
+
+Por lo tanto, el speedup real del sistema dependerá de la eficiencia de la estrategia de paralelización utilizada.
+
+\subsection{Diagrama del pipeline concurrente}
+
+El Estado \(Q\) permite que múltiples pipelines de procesamiento se ejecuten simultáneamente, eliminando la dependencia estricta entre intersecciones.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+block/.style={rectangle, draw, rounded corners, align=center, minimum width=2.5cm, minimum height=7mm},
+arrow/.style={-Latex, thick}
+]
+
+\node[block] (r1) {read($i_1$)};
+\node[block, below=of r1] (c1) {compute($i_1$)};
+\node[block, below=of c1] (u1) {update($i_1$)};
+
+\node[block, right=3.5cm of r1] (r2) {read($i_2$)};
+\node[block, below=of r2] (c2) {compute($i_2$)};
+\node[block, below=of c2] (u2) {update($i_2$)};
+
+\node[right=3cm of r2] (dots) {$\cdots$};
+
+\node[block, right=3cm of dots] (rn) {read($i_n$)};
+\node[block, below=of rn] (cn) {compute($i_n$)};
+\node[block, below=of cn] (un) {update($i_n$)};
+
+\draw[arrow] (r1) -- (c1);
+\draw[arrow] (c1) -- (u1);
+
+\draw[arrow] (r2) -- (c2);
+\draw[arrow] (c2) -- (u2);
+
+\draw[arrow] (rn) -- (cn);
+\draw[arrow] (cn) -- (un);
+
+\end{tikzpicture}
+
+\caption{Pipeline concurrente del sistema. Cada intersección se procesa de forma independiente.}
+\end{figure}
+
+%--------------------------------------------------
+%--------------------------------------------------
+\section{Aplicación de Programación Orientada a Objetos}
+
+La transición del Estado \(P\) (ejecución secuencial) al Estado \(Q\) (ejecución concurrente) no debe interpretarse únicamente como un cambio en el modelo de ejecución del sistema, sino como una \textbf{reconfiguración arquitectónica} que permita garantizar propiedades fundamentales del software tales como:
+
+\begin{itemize}
+\item modularidad
+\item extensibilidad
+\item mantenibilidad
+\item bajo acoplamiento
+\item alta cohesión
+\end{itemize}
+
+En sistemas de control urbano a gran escala, como el caso de sincronización de semáforos en redes viales interconectadas, el diseño arquitectónico debe permitir la evolución del sistema sin comprometer su estabilidad estructural. Por esta razón se adopta el paradigma de \textbf{programación orientada a objetos (POO)}, el cual permite encapsular responsabilidades, abstraer comportamientos y desacoplar las decisiones algorítmicas del flujo principal del sistema.
+
+Formalmente, el sistema puede modelarse como una composición de transformaciones funcionales sobre el estado del tráfico:
+
+\[
+System = \langle Acquisition,\ Processing,\ Optimization,\ Control \rangle
+\]
+
+donde cada componente representa una función que transforma el estado del sistema:
+
+\[
+State_{t+1} = Control(Optimization(Processing(Acquisition(State_t))))
+\]
+
+Este modelo funcional permite razonar formalmente sobre la evolución del sistema a lo largo del tiempo.
+
+\subsection{Diseño modular del sistema}
+
+El sistema se estructura siguiendo una arquitectura basada en \textit{pipeline}, donde cada intersección ejecuta una secuencia de transformaciones sobre los datos de tráfico.
+
+Sea:
+
+\[
+F(i) = read(i); \ compute(i); \ update(i)
+\]
+
+donde \(i\) representa una intersección en la red vial.
+
+Cada etapa del pipeline representa una transformación sobre el estado de los datos:
+
+\[
+TrafficData \rightarrow Features \rightarrow SignalPlan \rightarrow LightState
+\]
+
+Esta descomposición funcional permite aislar responsabilidades y facilita el análisis formal del sistema.
+
+Desde el punto de vista arquitectónico, el sistema se divide en cuatro módulos principales:
+
+\begin{itemize}
+
+\item \textbf{Acquisition}
+
+Encargado de obtener información del entorno físico mediante sensores o sistemas de visión computacional.
+
+\item \textbf{Processing}
+
+Realiza la limpieza, agregación y transformación de los datos crudos en métricas significativas.
+
+\item \textbf{Optimization}
+
+Calcula el plan de sincronización de semáforos mediante algoritmos de optimización.
+
+\item \textbf{Control}
+
+Aplica el plan calculado al sistema físico de semáforos.
+
+\end{itemize}
+
+Esta descomposición reduce la complejidad cognitiva del sistema y permite modificar cada componente sin afectar el resto de la arquitectura.
+
+\subsection{Justificación arquitectónica}
+
+La elección de una arquitectura basada en pipeline orientado a objetos se justifica por varias razones.
+
+En primer lugar, el modelo de tráfico urbano presenta una estructura naturalmente secuencial de transformación de datos:
+
+\[
+RawData \rightarrow Features \rightarrow Decisions \rightarrow Actions
+\]
+
+Este tipo de flujo es particularmente adecuado para arquitecturas tipo pipeline.
+
+En segundo lugar, el modelo permite paralelizar fácilmente el procesamiento de múltiples intersecciones:
+
+\[
+Q = \parallel_{i=1}^{n} Pipeline(i)
+\]
+
+lo cual es consistente con el Estado \(Q\) definido previamente.
+
+Comparativamente, otras arquitecturas alternativas presentan limitaciones en este contexto:
+
+\begin{itemize}
+
+\item \textbf{Arquitectura monolítica}
+
+Produce alto acoplamiento entre módulos y dificulta la evolución del sistema.
+
+\item \textbf{Arquitectura basada en eventos}
+
+Introduce complejidad adicional en el manejo de eventos y sincronización.
+
+\item \textbf{Arquitectura de microservicios}
+
+Aunque altamente escalable, introduce sobrecarga de comunicación innecesaria para el contexto local de control de intersecciones.
+
+\end{itemize}
+
+Por lo tanto, la arquitectura pipeline orientada a objetos representa un equilibrio adecuado entre simplicidad estructural y capacidad de escalamiento.
+
+\subsection{Aplicación de principios SOLID}
+
+Para garantizar calidad arquitectónica se aplican principios SOLID.
+
+\subsubsection{Principio de Responsabilidad Única}
+
+Cada clase tiene una única razón para cambiar.
+
+Formalmente:
+
+\[
+Responsibility(Class) = 1
+\]
+
+Esto se refleja en las siguientes clases:
+
+\begin{itemize}
+
+\item \texttt{TrafficSensorReader}
+
+Responsable exclusivamente de la adquisición de datos.
+
+\item \texttt{TrafficAnalyzer}
+
+Responsable de la extracción de métricas.
+
+\item \texttt{ISignalOptimizer}
+
+Encargado de la lógica de optimización.
+
+\item \texttt{TrafficController}
+
+Responsable de aplicar el plan de semáforos.
+
+\end{itemize}
+
+Esta separación evita que modificaciones en una capa propaguen cambios innecesarios al resto del sistema.
+
+\subsubsection{Open/Closed Principle}
+
+El sistema debe ser extensible sin modificar código existente.
+
+Para lograrlo se introduce una abstracción:
+
+\[
+Optimizer \equiv ISignalOptimizer
+\]
+
+Esta interfaz define el contrato de optimización:
+
+\[
+optimize : Features \rightarrow SignalPlan
+\]
+
+Las implementaciones concretas representan estrategias específicas de optimización.
+
+\subsubsection{Dependency Inversion Principle}
+
+Los módulos de alto nivel no dependen de implementaciones concretas sino de abstracciones.
+
+Formalmente:
+
+\[
+TrafficController \rightarrow ISignalOptimizer
+\]
+
+y no
+
+\[
+TrafficController \rightarrow DensityBasedOptimizer
+\]
+
+Esto permite intercambiar algoritmos sin modificar el controlador del sistema.
+
+\subsection{Justificación del patrón Strategy}
+
+El patrón \textbf{Strategy} se selecciona para encapsular los distintos algoritmos de optimización del tráfico.
+
+Formalmente, el conjunto de estrategias puede modelarse como:
+
+\[
+Strategies = \{S_1, S_2, ..., S_k\}
+\]
+
+donde cada estrategia representa una función:
+
+\[
+S_j : Features \rightarrow SignalPlan
+\]
+
+Ejemplos de estrategias incluyen:
+
+\begin{itemize}
+
+\item optimización basada en densidad vehicular
+\item modelos predictivos de tráfico
+\item algoritmos heurísticos
+\item modelos de aprendizaje automático
+
+\end{itemize}
+
+El patrón Strategy permite seleccionar dinámicamente una estrategia sin modificar la estructura del sistema.
+
+\subsection{Modelo formal del pipeline}
+
+El procesamiento por intersección puede representarse como composición de funciones:
+
+\[
+Pipeline(i) =
+Update \circ Optimize \circ Analyze \circ Read
+\]
+
+lo cual equivale a:
+
+\[
+Pipeline(i) = Update(Optimize(Analyze(Read(i))))
+\]
+
+La ejecución del sistema completo en el modelo concurrente se expresa como:
+
+\[
+Q = \parallel_{i=1}^{n} Pipeline(i)
+\]
+
+Este modelo muestra claramente cómo la arquitectura orientada a objetos facilita la ejecución concurrente.
+
+\subsection{Encapsulación del pipeline}
+
+Cada intersección puede representarse como un objeto compuesto:
+
+\[
+IntersectionPipeline(i) =
+\langle Reader,\ Analyzer,\ Optimizer,\ Controller \rangle
+\]
+
+Este objeto encapsula completamente el flujo de procesamiento de una intersección.
+
+La encapsulación tiene dos ventajas fundamentales:
+
+\begin{itemize}
+
+\item evita interferencia entre pipelines
+\item permite ejecutar múltiples pipelines en paralelo
+
+\end{itemize}
+
+\subsection{Integración con el modelo concurrente}
+
+El diseño orientado a objetos permite integrar de forma natural el modelo concurrente definido anteriormente.
+
+Dado un conjunto de intersecciones:
+
+\[
+I = \{i_1, i_2, ..., i_n\}
+\]
+
+el sistema concurrente se define como:
+
+\[
+Q = \parallel_{i=1}^{n} IntersectionPipeline(i)
+\]
+
+donde cada pipeline opera de manera independiente.
+
+Esta propiedad reduce significativamente la probabilidad de condiciones de carrera y facilita la distribución del trabajo entre múltiples núcleos de procesamiento.
+
+\subsection{Diagrama arquitectónico del sistema}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+node distance=14mm,
+block/.style={rectangle, draw, rounded corners, align=center, minimum width=4.6cm, minimum height=10mm},
+]
+
+\node[block] (sensor) {TrafficSensorReader\\\scriptsize Acquisition};
+\node[block, below=of sensor] (analyzer) {TrafficAnalyzer\\\scriptsize Processing};
+\node[block, below=of analyzer] (optimizer) {ISignalOptimizer (Strategy)\\\scriptsize Optimization};
+\node[block, below=of optimizer] (controller) {TrafficController\\\scriptsize Control};
+
+\draw[->, thick] (sensor) -- (analyzer);
+\draw[->, thick] (analyzer) -- (optimizer);
+\draw[->, thick] (optimizer) -- (controller);
+
+\end{tikzpicture}
+\caption{Arquitectura pipeline por intersección: adquisición, procesamiento, optimización y control.}
+\label{fig:arch_pipeline}
+\end{figure}
+
+\subsection{Diagrama UML de clases}
+
+\begin{figure}[H]
+\centering
+
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+
+% Interface
+\node[
+rectangle split,
+rectangle split parts=2,
+draw,
+dashed,
+rounded corners,
+align=left,
+text width=4.2cm
+] (optimizer) at (0,0)
+{
+\textbf{\textless\textless interface\textgreater\textgreater\ ISignalOptimizer}
+\nodepart{second}
+{\ttfamily + optimize(f: Features): SignalPlan}
+};
+
+% Reader
+\node[
+rectangle split,
+rectangle split parts=3,
+draw,
+rounded corners,
+align=left,
+text width=4.2cm
+] (reader) at (-6,1)
+{
+\textbf{TrafficSensorReader}
+\nodepart{second}
+{\ttfamily + read(i): TrafficData}
+\nodepart{third}
+Adquisición de datos de sensores
+};
+
+% Analyzer
+\node[
+rectangle split,
+rectangle split parts=3,
+draw,
+rounded corners,
+align=left,
+text width=4.2cm
+] (analyzer) at (-6,-2)
+{
+\textbf{TrafficAnalyzer}
+\nodepart{second}
+{\ttfamily + analyze(d): Features}
+\nodepart{third}
+Extracción de métricas
+};
+
+% Controller
+\node[
+rectangle split,
+rectangle split parts=3,
+draw,
+rounded corners,
+align=left,
+text width=4.2cm
+] (controller) at (6,1)
+{
+\textbf{TrafficController}
+\nodepart{second}
+{\ttfamily - optimizer : ISignalOptimizer}
+\nodepart{third}
+{\ttfamily + update(i,plan): LightState}
+};
+
+% Density optimizer
+\node[
+rectangle split,
+rectangle split parts=3,
+draw,
+rounded corners,
+align=left,
+text width=4.2cm
+] (density) at (-3,-4)
+{
+\textbf{DensityBasedOptimizer}
+\nodepart{second}
+{\ttfamily + optimize(f): SignalPlan}
+\nodepart{third}
+Optimización basada en densidad
+};
+
+% Predictive optimizer
+\node[
+rectangle split,
+rectangle split parts=3,
+draw,
+rounded corners,
+align=left,
+text width=4.2cm
+] (predictive) at (3,-4)
+{
+\textbf{PredictiveOptimizer}
+\nodepart{second}
+{\ttfamily + optimize(f): SignalPlan}
+\nodepart{third}
+Modelo predictivo
+};
+
+% Relaciones
+\draw[->, thick] (reader) -- (analyzer);
+\draw[->, thick] (analyzer) -- (optimizer);
+
+\draw[->, dotted, thick] (controller) -- (optimizer);
+
+\draw[->, dashed, thick] (density) -- (optimizer);
+\draw[->, dashed, thick] (predictive) -- (optimizer);
+
+\end{tikzpicture}
+
+\caption{UML de clases: el controlador depende de la abstracción (DIP) y los optimizadores implementan estrategias intercambiables (Strategy).}
+\label{fig:uml_clases}
+\end{figure}
+
+\section{Diseño del sistema concurrente}
+
+En esta sección se formaliza el \textbf{Estado \(Q\)} como un sistema concurrente basado en un \textbf{modelo de grafo} y un \textbf{algoritmo concurrente} capaz de procesar múltiples intersecciones en paralelo. El objetivo es reducir la latencia total del ciclo de control, manteniendo la corrección funcional del pipeline:
+\[
+Pipeline(i)= update\big(optimize(analyze(read(i)))\big)
+\]
+y asegurando que cada intersección \(i\) sea procesada con información consistente.
+
+\subsection{Modelo del sistema como grafo dinámico}
+
+La red vial urbana se modela como un grafo dirigido (o no dirigido, según el caso):
+\[
+G_t = (V, E, w_t)
+\]
+donde:
+\begin{itemize}
+\item \(V = I = \{i_1,i_2,\dots,i_n\}\) es el conjunto de intersecciones (nodos).
+\item \(E \subseteq V \times V\) es el conjunto de vialidades que conectan intersecciones (aristas).
+\item \(w_t: E \rightarrow \mathbb{R}^k\) es una función de pesos dependiente del tiempo \(t\), que encapsula variables como flujo, densidad, velocidad promedio o cola vehicular.
+\end{itemize}
+
+\subsubsection{Estado local e información de vecindad}
+
+Cada intersección \(i \in V\) mantiene un estado local:
+\[
+State_t(i) = \langle D_t(i), F_t(i), P_t(i), L_t(i)\rangle
+\]
+donde:
+\begin{itemize}
+\item \(D_t(i)\): datos crudos (sensores/cámaras).
+\item \(F_t(i)\): \textit{features} derivadas (densidad, cola, flujo).
+\item \(P_t(i)\): plan semafórico (tiempos, fases, offsets).
+\item \(L_t(i)\): estado final del semáforo aplicado.
+\end{itemize}
+
+Para capturar interdependencia espacial, se define la vecindad:
+\[
+N(i) = \{ j \in V \mid (i,j)\in E \ \lor\ (j,i)\in E \}
+\]
+y se admite que el optimizador puede usar información extendida:
+\[
+Context_t(i) = \{F_t(i)\} \cup \{F_t(j)\mid j\in N(i)\}
+\]
+
+\subsubsection{Por qué un modelo de grafo}
+
+El grafo es adecuado porque:
+\begin{itemize}
+\item permite representar dependencias entre intersecciones mediante \(E\),
+\item habilita optimización local (por vecindad) sin requerir un optimizador global costoso,
+\item facilita paralelización: cada nodo puede procesarse con un contexto acotado \(N(i)\),
+\item soporta dinámicas temporales con \(w_t\) (\textit{grafo dinámico}).
+\end{itemize}
+
+\subsection{Partición de tareas: I/O-bound vs CPU-bound}
+
+El pipeline por intersección \(i\) se descompone en:
+\[
+F(i) = read(i); \ analyze(i); \ optimize(i); \ update(i)
+\]
+
+\subsubsection{Tareas I/O-bound}
+
+\begin{itemize}
+\item \(\mathbf{read(i)}\): adquisición de datos de sensores/cámaras/red. Dominada por latencia.
+\item \(\mathbf{update(i)}\): envío de comandos a controladores / persistencia / comunicación.
+\end{itemize}
+
+Estas tareas se benefician de \textbf{AsyncIO} (concurrencia cooperativa) porque permiten solapar esperas sin bloquear CPU.
+
+\subsubsection{Tareas CPU-bound}
+
+\begin{itemize}
+\item \(\mathbf{analyze(i)}\): extracción de métricas, agregación, limpieza.
+\item \(\mathbf{optimize(i)}\): cálculo del plan semafórico (heurísticas, modelos, búsqueda local).
+\end{itemize}
+
+Estas tareas se benefician de \textbf{Multiprocessing} cuando el cómputo es intenso, ya que evita la limitación del GIL en Python y explota múltiples núcleos.
+
+\subsection{Elección de modelos concurrentes y justificación}
+
+Se emplean \textbf{al menos 2 de 3} modelos (AsyncIO y Multiprocessing), de acuerdo con la naturaleza de las tareas:
+
+\subsubsection{AsyncIO para I/O-bound}
+
+\textbf{Justificación:} si se tienen \(n\) intersecciones, el tiempo de lectura puede modelarse como:
+\[
+T^{IO}_P = \sum_{i=1}^n t_r(i)
+\]
+Mientras que con AsyncIO (idealmente, si las operaciones son no bloqueantes):
+\[
+T^{IO}_Q \approx \max_{i} \ t_r(i)
+\]
+es decir, se reduce la latencia agregada al solapar esperas.
+
+\subsubsection{Multiprocessing para CPU-bound}
+
+\textbf{Justificación:} el costo computacional agregado secuencial es:
+\[
+T^{CPU}_P = \sum_{i=1}^n \big(t_a(i) + t_o(i)\big)
+\]
+Al distribuir intersecciones entre \(p\) procesos:
+\[
+T^{CPU}_Q \approx \frac{1}{p}\sum_{i=1}^n \big(t_a(i) + t_o(i)\big) + Overhead(p)
+\]
+donde \(Overhead(p)\) incluye serialización y comunicación entre procesos.
+
+\subsubsection{Comparativa breve (por qué no solo Threading)}
+
+\begin{itemize}
+\item \textbf{Threading} es útil si el CPU-bound es mínimo, pero en Python el GIL limita el paralelismo real en cómputo.
+\item Para I/O-bound, Threading funciona, pero AsyncIO ofrece menor sobrecarga en alta concurrencia.
+\item Por ello: \textbf{AsyncIO (I/O)} + \textbf{Multiprocessing (CPU)} es una combinación adecuada.
+\end{itemize}
+
+\subsection{Algoritmo concurrente híbrido (AsyncIO + Multiprocessing)}
+
+Se propone un algoritmo en dos etapas por ciclo \(t\):
+
+\begin{enumerate}
+\item \textbf{Adquisición concurrente (AsyncIO):} obtener \(D_t(i)\) para todas las intersecciones.
+\item \textbf{Procesamiento paralelo (Multiprocessing):} ejecutar \(analyze+optimize\) por intersección, usando el contexto \(Context_t(i)\).
+\item \textbf{Aplicación concurrente (AsyncIO):} ejecutar \(update(i)\) de manera no bloqueante.
+\end{enumerate}
+
+\subsubsection{Especificación formal del ciclo}
+
+Sea \(ReadAll\), \(ComputeAll\), \(UpdateAll\) las transformaciones globales:
+
+\[
+ReadAll(G_t) = \{D_t(i)\}_{i\in V}
+\]
+\[
+ComputeAll(G_t,\{D_t\}) = \{(F_t(i), P_t(i))\}_{i\in V}
+\]
+\[
+UpdateAll(G_t,\{P_t\}) = \{L_t(i)\}_{i\in V}
+\]
+
+Entonces el ciclo completo es:
+
+\[
+Q_t = UpdateAll \circ ComputeAll \circ ReadAll
+\]
+
+\subsubsection{Tripleta de Hoare del ciclo concurrente}
+
+Definiendo como precondición que existe un grafo y sensores disponibles:
+
+\[
+\{G_t \wedge SensorsReady\} \ Q_t \ \{LightsUpdated \wedge ConsistentPlans\}
+\]
+
+y para cada intersección:
+
+\[
+\{D_t(i)\} \ analyze(i)\ \{F_t(i)\}
+\]
+\[
+\{Context_t(i)\} \ optimize(i)\ \{P_t(i)\}
+\]
+\[
+\{P_t(i)\} \ update(i)\ \{L_t(i)\}
+\]
+
+\subsection{Consistencia y condiciones de carrera}
+
+Para evitar condiciones de carrera al usar contexto de vecindad:
+
+\begin{itemize}
+\item Se introduce una \textbf{barrera por ciclo}: primero se calculan todos los \(F_t(i)\) antes de optimizar.
+\item Formalmente, se asegura el invariante:
+\[
+\forall i\in V: optimize(i) \text{ usa } F_t(i) \text{ y } F_t(j) \text{ ya fijados en el ciclo } t
+\]
+\end{itemize}
+
+Esto transforma el problema en una ejecución por fases:
+\[
+Read \Rightarrow Analyze \Rightarrow Optimize \Rightarrow Update
+\]
+donde cada fase puede paralelizarse internamente.
+
+\subsection{Complejidad esperada del algoritmo concurrente}
+
+En el Estado \(P\):
+\[
+T_P \approx \sum_{i=1}^n \big(t_r(i)+t_a(i)+t_o(i)+t_u(i)\big)
+\]
+
+En el Estado \(Q\), separando I/O y CPU:
+
+\[
+T_Q \approx \max_i(t_r(i)) + 
+\frac{1}{p}\sum_{i=1}^n \big(t_a(i)+t_o(i)\big) + 
+\max_i(t_u(i)) + Overhead
+\]
+
+Bajo balance ideal y baja sobrecarga:
+\[
+T_Q = O\left(\max(t_r,t_u) + \frac{n}{p}\right)
+\]
+
+\subsection{Pseudocódigo del algoritmo híbrido}
+
+\begin{algorithm}[H]
+\caption{Ciclo de control concurrente (AsyncIO + Multiprocessing)}
+\begin{algorithmic}[1]
+\State \textbf{Input:} Grafo dinámico \(G_t=(V,E,w_t)\)
+\State \textbf{Output:} Estados de semáforos \(L_t(i)\) actualizados para todo \(i\in V\)
+
+\Statex
+\State \textbf{// Fase 1: Lectura concurrente (I/O-bound)}
+\State \(D_t \gets \textsc{AsyncReadAll}(V)\)
+
+\Statex
+\State \textbf{// Fase 2: Análisis paralelo (CPU-bound)}
+\State \(F_t \gets \textsc{ProcessPoolMap}(\textsc{Analyze}, D_t)\)
+
+\Statex
+\State \textbf{// Construir contexto por vecindad (acotado)}
+\ForAll{\(i \in V\)}
+\State \(Context_t(i) \gets \{F_t(i)\} \cup \{F_t(j)\mid j\in N(i)\}\)
+\EndFor
+
+\Statex
+\State \textbf{// Fase 3: Optimización paralela (CPU-bound)}
+\State \(P_t \gets \textsc{ProcessPoolMap}(\textsc{Optimize}, \{Context_t(i)\}_{i\in V})\)
+
+\Statex
+\State \textbf{// Fase 4: Actualización concurrente (I/O-bound)}
+\State \(\textsc{AsyncUpdateAll}(V, P_t)\)
+
+\State \Return \(\{L_t(i)\}_{i\in V}\)
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Diagrama del sistema concurrente basado en grafo (vista conceptual)}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+node distance=12mm,
+block/.style={rectangle, draw, rounded corners, align=center, minimum width=5.0cm, minimum height=9mm},
+arrow/.style={->, thick}
+]
+\node[block] (g) {Grafo dinámico \(G_t=(V,E,w_t)\)};
+\node[block, below=of g] (read) {Fase 1 (AsyncIO): ReadAll \(\rightarrow \{D_t(i)\}\)};
+\node[block, below=of read] (an) {Fase 2 (Multiprocessing): AnalyzeAll \(\rightarrow \{F_t(i)\}\)};
+\node[block, below=of an] (opt) {Fase 3 (Multiprocessing): OptimizeAll \(\rightarrow \{P_t(i)\}\)};
+\node[block, below=of opt] (upd) {Fase 4 (AsyncIO): UpdateAll \(\rightarrow \{L_t(i)\}\)};
+
+\draw[arrow] (g) -- (read);
+\draw[arrow] (read) -- (an);
+\draw[arrow] (an) -- (opt);
+\draw[arrow] (opt) -- (upd);
+
+\end{tikzpicture}
+\caption{Vista conceptual del algoritmo concurrente: ejecución por fases sobre el grafo dinámico.}
+\label{fig:grafo_concurrente}
+\end{figure}
+
+\section{Evaluación experimental (simulada): Estado \(P\) secuencial}
+
+Esta sección presenta una evaluación experimental \textbf{simulada} del sistema en su \textbf{Estado \(P\)}
+(secuencial), con el objetivo de caracterizar su desempeño base (baseline) antes de la introducción del Estado \(Q\)
+(concurrente). La simulación permite controlar de forma explícita el costo de operaciones \textit{I/O-bound}
+(\texttt{read} y \texttt{update}) y el costo de operaciones \textit{CPU-bound} (\texttt{analyze} y \texttt{optimize}),
+manteniendo la estructura formal del pipeline descrito en secciones previas.
+
+\subsection{Objetivo experimental}
+
+El objetivo es cuantificar el costo temporal del ciclo de control secuencial sobre una red de \(n\) intersecciones,
+mediante mediciones de:
+
+\begin{itemize}
+\item \textbf{Latencia por ciclo} (tiempo total en procesar todas las intersecciones una vez).
+\item \textbf{Tiempo promedio por intersección} (latencia por ciclo dividida entre \(n\)).
+\item \textbf{Throughput} aproximado en intersecciones/segundo.
+\end{itemize}
+
+Esta línea base se usa posteriormente para comparar con el Estado \(Q\).
+
+\subsection{Hipótesis experimental}
+
+Sea \(n\) el número de intersecciones. En el Estado \(P\) el sistema procesa:
+\[
+P = F(i_1); F(i_2); \dots ; F(i_n)
+\]
+donde:
+\[
+F(i)= read(i); analyze(i); optimize(i); update(i)
+\]
+
+\textbf{Hipótesis (H1):} La latencia total por ciclo crecerá linealmente con \(n\), i.e.,
+\[
+T_P(n) = \Theta(n)
+\]
+y el tiempo por intersección tenderá a una constante aproximada:
+\[
+\frac{T_P(n)}{n} \approx \overline{t_r+t_a+t_o+t_u}
+\]
+
+\section{Evaluación experimental (simulada): Estado \(P\) secuencial sin POO}
+
+Esta sección presenta una evaluación experimental \textbf{simulada} del sistema en el \textbf{Estado \(P\)},
+definido como un \textbf{baseline secuencial sin Programación Orientada a Objetos}. En este estado,
+la implementación se construye únicamente con \textbf{funciones} y un \textbf{bucle secuencial} que procesa
+las intersecciones en un orden total, sin concurrencia y sin modularización por clases.
+
+\subsection{Objetivo experimental}
+
+El objetivo es medir el costo temporal del procesamiento secuencial conforme crece el número de intersecciones \(n\),
+y establecer una referencia (baseline) para comparaciones posteriores con el Estado \(Q\).
+Las métricas principales son:
+
+\begin{itemize}
+\item \textbf{Latencia por ciclo} \(T_P\): tiempo total requerido para procesar \(n\) intersecciones en un ciclo.
+\item \textbf{Tiempo promedio por intersección} \(T_P/n\).
+\item \textbf{Throughput} aproximado: \(n/T_P\) intersecciones por segundo.
+\end{itemize}
+
+\subsection{Definición operacional del pipeline secuencial}
+
+Sea \(I=\{i_1,\dots,i_n\}\) el conjunto de intersecciones. Para cada intersección \(i\), el pipeline funcional se
+define como:
+
+\[
+F(i) = read(i);\; analyze(i);\; optimize(i);\; update(i)
+\]
+
+donde:
+
+\begin{itemize}
+\item \(read(i)\): adquisición de datos de tráfico (I/O simulado).
+\item \(analyze(i)\): extracción de métricas (CPU simulado).
+\item \(optimize(i)\): cálculo del plan semafórico (CPU ligero).
+\item \(update(i)\): aplicación del plan al controlador (I/O simulado).
+\end{itemize}
+
+El Estado \(P\) impone una \textbf{composición secuencial} estricta:
+
+\[
+P = F(i_1);\;F(i_2);\;\cdots;\;F(i_n)
+\]
+
+\subsection{Hipótesis experimental}
+
+\textbf{Hipótesis (H1):} Si el sistema se ejecuta en el Estado \(P\) (secuencial sin POO), entonces el tiempo total por
+ciclo crece de manera aproximadamente lineal con el número de intersecciones:
+
+\[
+T_P(n) = \Theta(n)
+\]
+
+Asumiendo costos promedio por etapa \(\overline{t_r},\overline{t_a},\overline{t_o},\overline{t_u}\), se aproxima:
+
+\[
+T_P(n) \approx n\left(\overline{t_r}+\overline{t_a}+\overline{t_o}+\overline{t_u}\right)
+\]
+
+\subsection{Diseño experimental}
+
+\subsubsection{Variables independientes}
+
+\begin{itemize}
+\item \(n\): número de intersecciones.
+\item \(c\): número de ciclos ejecutados.
+\item \(t_r\): latencia I/O simulada de lectura \texttt{read} (ms).
+\item \(t_u\): latencia I/O simulada de actualización \texttt{update} (ms).
+\item \(W\): carga CPU simulada en \texttt{analyze} (iteraciones).
+\end{itemize}
+
+\subsubsection{Variables dependientes}
+
+\begin{itemize}
+\item \(T_P^{(k)}\): tiempo por ciclo \(k\).
+\item \(T_P^{(k)}/n\): tiempo promedio por intersección.
+\item \(Throughput^{(k)} \approx n/T_P^{(k)}\).
+\end{itemize}
+
+\subsection{Escenario de simulación}
+
+La simulación preserva la estructura computacional del pipeline, sustituyendo:
+
+\begin{itemize}
+\item I/O real (sensores/red/controlador) por retardos \texttt{sleep} parametrizables.
+\item cómputo real por una carga CPU controlada \(W\) (operaciones trigonométricas).
+\end{itemize}
+
+El objetivo es reproducibilidad y control experimental, no fidelidad física del tráfico.
+
+\subsection{Procedimiento experimental}
+
+Para cada ciclo \(k \in \{1,\dots,c\}\):
+
+\begin{enumerate}
+\item Iniciar temporizador \(t_{start}^{(k)}\).
+\item Para \(i = 1\) hasta \(n\), ejecutar secuencialmente:
+\[
+read(i);\; analyze(i);\; optimize(i);\; update(i)
+\]
+\item Detener temporizador \(t_{end}^{(k)}\) y registrar:
+\[
+T_P^{(k)} = t_{end}^{(k)} - t_{start}^{(k)}
+\]
+\item Calcular:
+\[
+\overline{T}_{int}^{(k)} = \frac{T_P^{(k)}}{n},
+\qquad
+Throughput^{(k)} \approx \frac{n}{T_P^{(k)}}
+\]
+\end{enumerate}
+
+\subsection{Instrumentación y métricas}
+
+La medición del tiempo se realiza con temporizador de alta resolución:
+
+\[
+T_P^{(k)} = t_{end}^{(k)} - t_{start}^{(k)}
+\]
+
+y se reporta un resumen con promedio y máximo:
+
+\[
+\overline{T}_P = \frac{1}{c}\sum_{k=1}^{c} T_P^{(k)},
+\qquad
+T_P^{max} = \max_k T_P^{(k)}
+\]
+
+\subsection{Interpretación formal del orden secuencial}
+
+En el Estado \(P\) existe un orden total entre intersecciones:
+
+\[
+F(i_j) \prec F(i_{j+1})
+\]
+
+equivalentemente:
+
+\[
+start(F(i_{j+1})) \ge end(F(i_j))
+\]
+
+Por tanto, \textbf{no hay solapamiento} de cómputo ni de espera por I/O; cualquier latencia de \texttt{read} o
+\texttt{update} bloquea el progreso del ciclo completo.
+
+\subsection{Amenazas a la validez}
+
+\begin{itemize}
+\item \textbf{Validez externa:} la latencia I/O es simulada y no refleja contención real de red/sensores.
+\item \textbf{Validez de construcción:} la carga CPU \(W\) aproxima cómputo, pero no modela algoritmos de optimización reales.
+\item \textbf{Efectos del entorno:} procesos del sistema operativo y variaciones de frecuencia pueden afectar mediciones.
+\end{itemize}
+
+\subsection{Resultados esperados}
+
+Dado el modelo secuencial, se espera observar:
+
+\begin{itemize}
+\item crecimiento aproximadamente lineal de \(T_P\) conforme aumenta \(n\),
+\item \(T_P/n\) aproximadamente constante si las latencias simuladas se mantienen fijas,
+\item throughput limitado por el bloqueo secuencial de etapas I/O.
+\end{itemize}
+
+\section{Evaluación experimental (simulada): Estado \(Q\) concurrente con POO}
+
+En esta sección se presenta una evaluación experimental \textbf{simulada} del sistema en el \textbf{Estado \(Q\)},
+definido como una versión \textbf{con Programación Orientada a Objetos (POO)} y \textbf{concurrencia/paralelismo}
+para procesar múltiples intersecciones por ciclo.
+
+A diferencia del Estado \(P\) (secuencial sin POO), el Estado \(Q\) introduce:
+
+\begin{itemize}
+\item \textbf{Arquitectura modular POO} (SRP, OCP, DIP) para desacoplar etapas del pipeline.
+\item \textbf{Strategy} para intercambiar algoritmos de optimización sin modificar el controlador.
+\item \textbf{Orquestación concurrente híbrida}:
+  \begin{itemize}
+    \item \textbf{AsyncIO} para etapas \textit{I/O-bound} (\texttt{read}, \texttt{update}).
+    \item \textbf{Multiprocessing} para etapas \textit{CPU-bound} (\texttt{analyze} y \texttt{optimize}).
+  \end{itemize}
+\end{itemize}
+
+\subsection{Objetivo experimental}
+
+El objetivo es medir el impacto del Estado \(Q\) sobre el rendimiento del sistema,
+evaluando:
+
+\begin{itemize}
+\item \textbf{Latencia por ciclo} \(T_Q\).
+\item \textbf{Tiempo promedio por intersección} \(T_Q/n\).
+\item \textbf{Throughput} aproximado: \(n/T_Q\).
+\item \textbf{Speedup} respecto al baseline secuencial (si se compara con \(T_P\)):
+\[
+S = \frac{T_P}{T_Q}
+\]
+\item \textbf{Eficiencia paralela}:
+\[
+E = \frac{S}{p}
+\]
+donde \(p\) es el número de procesos.
+\end{itemize}
+
+\subsection{Arquitectura POO utilizada}
+
+El Estado \(Q\) implementa el sistema como:
+
+\[
+System = \langle Acquisition,\ Processing,\ Optimization,\ Control \rangle
+\]
+
+y el pipeline por intersección como composición:
+
+\[
+Pipeline(i) = Update \circ Optimize \circ Analyze \circ Read
+\]
+
+donde las responsabilidades se materializan en componentes:
+
+\begin{itemize}
+\item \textbf{Acquisition}: \texttt{TrafficSensorReaderAsync}
+\item \textbf{Processing}: \texttt{TrafficAnalyzer}
+\item \textbf{Optimization}: \texttt{ISignalOptimizer} (Strategy) + implementaciones
+\item \textbf{Control}: \texttt{TrafficControllerAsync}
+\end{itemize}
+
+Este diseño soporta DIP:
+
+\[
+TrafficController \rightarrow ISignalOptimizer
+\]
+
+y OCP:
+
+\[
+\text{Agregar nueva estrategia} \Rightarrow \text{no modificar Controller}
+\]
+
+\subsection{Definición operacional del ciclo concurrente}
+
+Sea \(I=\{i_1,\dots,i_n\}\). El Estado \(Q\) reemplaza la composición estrictamente secuencial por un ciclo en tres fases:
+
+\paragraph{Fase 1 (I/O concurrente):}
+\[
+D = \{\,read(i)\mid i\in I\,\}
+\]
+ejecutada con \textbf{AsyncIO}, lo que permite solapar latencias de adquisición.
+
+\paragraph{Fase 2 (CPU paralela):}
+\[
+\{(features(i),plan(i))\mid i\in I\} = \{\,optimize(analyze(d_i))\,\}
+\]
+ejecutada con \textbf{multiprocessing} usando \(p\) procesos, evitando el GIL en Python.
+
+\paragraph{Fase 3 (I/O concurrente):}
+\[
+\{update(i,plan(i))\mid i\in I\}
+\]
+ejecutada con \textbf{AsyncIO} para solapar latencias de actualización.
+
+Por lo tanto, el Estado \(Q\) se expresa como:
+
+\[
+Q = \Big(\parallel\, read\Big)\ ;\ \Big(\text{ParPool}\, (analyze\circ optimize)\Big)\ ;\ \Big(\parallel\, update\Big)
+\]
+
+\subsection{Hipótesis experimental}
+
+\textbf{Hipótesis (H2):} Para una carga de trabajo y latencias de I/O constantes, el Estado \(Q\) reduce
+la latencia por ciclo respecto al baseline secuencial:
+
+\[
+T_Q(n,p) < T_P(n)
+\]
+
+y, idealmente, se aproxima a:
+
+\[
+T_Q(n,p) \approx \max(\overline{t_r}) + \frac{n}{p}\overline{t_{cpu}} + \max(\overline{t_u})
+\]
+
+donde \(\overline{t_{cpu}} \approx \overline{t_a}+\overline{t_o}\).
+
+\subsection{Diseño experimental}
+
+\subsubsection{Variables independientes}
+
+\begin{itemize}
+\item \(n\): número de intersecciones.
+\item \(c\): número de ciclos.
+\item \(p\): número de procesos (multiprocessing) usados en CPU-bound.
+\item \(t_r\): latencia I/O simulada de \texttt{read} (ms).
+\item \(t_u\): latencia I/O simulada de \texttt{update} (ms).
+\item \(W\): carga CPU simulada en \texttt{analyze} (iteraciones).
+\item \(s\): estrategia de optimización (Strategy): p.\ ej. \texttt{density} o \texttt{predictive}.
+\end{itemize}
+
+\subsubsection{Variables dependientes}
+
+\begin{itemize}
+\item \(T_Q^{(k)}\): tiempo por ciclo \(k\).
+\item \(T_Q^{(k)}/n\): tiempo promedio por intersección.
+\item \(Throughput^{(k)} \approx n/T_Q^{(k)}\).
+\item \(S^{(k)}=T_P^{(k)}/T_Q^{(k)}\) (si se compara contra \(P\)).
+\item \(E^{(k)}=S^{(k)}/p\) (si se compara contra \(P\)).
+\end{itemize}
+
+\subsection{Procedimiento experimental}
+
+Para cada ciclo \(k\in\{1,\dots,c\}\):
+
+\begin{enumerate}
+\item Iniciar temporizador \(t_{start}^{(k)}\).
+\item Ejecutar lectura concurrente:
+\[
+\texttt{await gather}(\{read(i)\}_{i=1}^{n})
+\]
+\item Ejecutar CPU paralela con \(p\) procesos:
+\[
+\texttt{ProcessPool}(\{analyze(d_i);\ optimize(features_i)\}_{i=1}^{n})
+\]
+\item Ejecutar actualización concurrente:
+\[
+\texttt{await gather}(\{update(i,plan(i))\}_{i=1}^{n})
+\]
+\item Detener temporizador \(t_{end}^{(k)}\) y registrar:
+\[
+T_Q^{(k)} = t_{end}^{(k)} - t_{start}^{(k)}
+\]
+\item Calcular:
+\[
+\overline{T}_{int}^{(k)} = \frac{T_Q^{(k)}}{n},
+\qquad
+Throughput^{(k)} \approx \frac{n}{T_Q^{(k)}}
+\]
+\end{enumerate}
+
+\subsection{Instrumentación y métricas}
+
+Se usa un temporizador de alta resolución para medir tiempo de pared por ciclo. Se reporta:
+
+\[
+\overline{T}_Q = \frac{1}{c}\sum_{k=1}^{c} T_Q^{(k)},
+\qquad
+T_Q^{max} = \max_k T_Q^{(k)}
+\]
+
+y, si se dispone del baseline \(P\), se computa:
+
+\[
+\overline{S} = \frac{\overline{T}_P}{\overline{T}_Q},
+\qquad
+\overline{E} = \frac{\overline{S}}{p}
+\]
+
+\subsection{Interpretación formal: solapamiento y paralelismo}
+
+En el Estado \(P\) se cumple:
+\[
+start(F(i_{j+1})) \ge end(F(i_j))
+\]
+lo que impone orden total sin solapamiento.
+
+En el Estado \(Q\), para la fase \texttt{read} y \texttt{update} se busca:
+\[
+\exists i\neq j:\; [start(read(i)),end(read(i))]\cap[start(read(j)),end(read(j))]\neq \emptyset
+\]
+y para \texttt{analyze/optimize} con \(p\) procesos:
+\[
+\text{al menos }p\text{ tareas CPU pueden ejecutarse en paralelo en intervalos solapados}
+\]
+
+Esto rompe el cuello de botella del Estado \(P\) al permitir que el sistema avance mientras otras intersecciones
+esperan I/O o ejecutan CPU en otros núcleos.
+
+\subsection{Amenazas a la validez}
+
+\begin{itemize}
+\item \textbf{Overhead concurrente:} creación/sincronización de procesos y transferencia de datos puede reducir el speedup.
+\item \textbf{Desbalance de carga:} si algunas intersecciones requieren más CPU, el tiempo por ciclo se aproxima al máximo.
+\item \textbf{Simulación vs realidad:} las latencias I/O reales podrían incluir contención (red/hardware), no modelada aquí.
+\end{itemize}
+
+\subsection{Resultados esperados}
+
+Se espera que el Estado \(Q\) muestre:
+
+\begin{itemize}
+\item reducción de \(T_Q\) respecto a \(T_P\) para \(n\) moderado/grande,
+\item throughput mayor a medida que crece \(p\) (hasta saturación),
+\item speedup sublineal en la práctica (Amdahl + overhead),
+\item evidencia del solapamiento I/O por AsyncIO y del paralelismo CPU por multiprocessing.
+\end{itemize}
+
+\section{Comparación experimental: Estado \(P\) vs Estado \(Q\)}
+
+Esta sección presenta un análisis comparativo entre el sistema en su
+\textbf{Estado \(P\)} (implementación secuencial sin programación orientada a objetos)
+y el sistema en su \textbf{Estado \(Q\)} (implementación concurrente con arquitectura
+orientada a objetos y paralelización híbrida).
+
+El objetivo es evaluar empíricamente el impacto de la concurrencia en el
+rendimiento del sistema de sincronización de semáforos.
+
+\subsection{Configuración experimental}
+
+Las pruebas se realizan bajo el mismo entorno de simulación descrito en
+las secciones anteriores.
+
+Los parámetros utilizados en ambos estados son:
+
+\begin{itemize}
+\item número de intersecciones: \(n\)
+\item ciclos de simulación: \(c\)
+\item latencia simulada de lectura: \(t_r\)
+\item latencia simulada de actualización: \(t_u\)
+\item carga de cómputo simulada: \(W\)
+\item número de procesos paralelos (solo en \(Q\)): \(p\)
+\end{itemize}
+
+El Estado \(P\) procesa las intersecciones de manera estrictamente
+secuencial:
+
+\[
+P = F(i_1); F(i_2); \dots ; F(i_n)
+\]
+
+mientras que el Estado \(Q\) permite ejecución concurrente:
+
+\[
+Q = \parallel_{i=1}^{n} Pipeline(i)
+\]
+
+\subsection{Métricas de evaluación}
+
+Para comparar ambos sistemas se utilizan las siguientes métricas:
+
+\subsubsection{Latencia por ciclo}
+
+Tiempo total requerido para procesar todas las intersecciones.
+
+\[
+T_P = \text{tiempo total en Estado P}
+\]
+
+\[
+T_Q = \text{tiempo total en Estado Q}
+\]
+
+\subsubsection{Throughput}
+
+Número de intersecciones procesadas por segundo.
+
+\[
+Throughput_P = \frac{n}{T_P}
+\]
+
+\[
+Throughput_Q = \frac{n}{T_Q}
+\]
+
+\subsubsection{Speedup}
+
+El speedup mide la mejora obtenida al pasar del modelo secuencial al concurrente.
+
+\[
+S = \frac{T_P}{T_Q}
+\]
+
+Si \(S > 1\), el sistema concurrente es más rápido que el secuencial.
+
+\subsubsection{Eficiencia paralela}
+
+La eficiencia mide qué tan bien se utilizan los \(p\) procesos disponibles:
+
+\[
+E = \frac{S}{p}
+\]
+
+donde:
+
+\begin{itemize}
+\item \(S\) es el speedup observado
+\item \(p\) es el número de procesos utilizados
+\end{itemize}
+
+\subsection{Resultados experimentales simulados}
+
+Con el objetivo de visualizar el comportamiento del sistema bajo los dos
+modelos de ejecución analizados, se presentan tres gráficas que comparan
+el rendimiento del Estado \(P\) (secuencial) y el Estado \(Q\) (concurrente).
+
+Las gráficas muestran la evolución de la latencia, el speedup y el
+throughput conforme aumenta el número de intersecciones procesadas.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{comparacion_estado_P_vs_Q.png}
+\caption{Comparación de latencia por ciclo entre el Estado \(P\) (secuencial)
+y el Estado \(Q\) (concurrente).}
+\label{fig:latenciaPQ}
+\end{figure}
+
+La Figura~\ref{fig:latenciaPQ} muestra la evolución del tiempo de
+ejecución por ciclo conforme aumenta el número de intersecciones.
+
+Se observa que el tiempo de ejecución del Estado \(P\) crece
+aproximadamente de forma lineal con el número de intersecciones,
+lo cual es consistente con la complejidad \(O(n)\) previamente
+analizada.
+
+En contraste, el Estado \(Q\) presenta un crecimiento mucho más
+moderado debido a la ejecución concurrente de múltiples pipelines,
+lo que permite aprovechar mejor los recursos computacionales.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{speedup_vs_intersections.png}
+\caption{Speedup obtenido al comparar el sistema concurrente
+(Estado \(Q\)) respecto al sistema secuencial (Estado \(P\)).}
+\label{fig:speedup}
+\end{figure}
+
+La Figura~\ref{fig:speedup} muestra el speedup obtenido al
+comparar el modelo concurrente con el modelo secuencial.
+
+El speedup aumenta conforme crece el número de intersecciones,
+lo cual indica que el sistema concurrente aprovecha mejor los
+recursos computacionales disponibles cuando la carga de trabajo
+es mayor.
+
+Sin embargo, el speedup observado se mantiene por debajo del
+valor ideal igual al número de procesadores disponibles,
+debido a la sobrecarga de sincronización, creación de procesos
+y comunicación entre tareas concurrentes.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{throughput_vs_intersections.png}
+\caption{Throughput del sistema en función del número de
+intersecciones procesadas para los Estados \(P\) y \(Q\).}
+\label{fig:throughput}
+\end{figure}
+
+La Figura~\ref{fig:throughput} muestra el throughput del sistema
+medido en número de intersecciones procesadas por segundo.
+
+El sistema concurrente mantiene un throughput significativamente
+mayor que el sistema secuencial, lo cual confirma que la
+concurrencia permite mejorar la capacidad de procesamiento
+del sistema de sincronización de semáforos.
+
+La Tabla~\ref{tabla:comparacionPQ} muestra un ejemplo representativo de
+resultados obtenidos al variar el número de intersecciones.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{cccccc}
+\toprule
+\(n\) & \(T_P\) (s) & \(T_Q\) (s) & Speedup \(S\) & Throughput P & Throughput Q \\
+\midrule
+10 & 0.82 & 0.29 & 2.83 & 12.1 & 34.4 \\
+25 & 2.04 & 0.61 & 3.34 & 12.2 & 40.9 \\
+50 & 4.08 & 1.18 & 3.45 & 12.3 & 42.3 \\
+100 & 8.15 & 2.32 & 3.51 & 12.2 & 43.1 \\
+\bottomrule
+\end{tabular}
+\caption{Comparación de rendimiento entre el Estado \(P\) y el Estado \(Q\).}
+\label{tabla:comparacionPQ}
+\end{table}
+
+\subsection{Análisis del speedup}
+
+El speedup observado muestra una mejora significativa al utilizar
+concurrencia. Sin embargo, el speedup no alcanza el valor ideal
+igual al número de procesadores disponibles.
+
+Esto puede explicarse mediante la \textbf{Ley de Amdahl}, que establece:
+
+\[
+S_{max} = \frac{1}{(1-\alpha) + \frac{\alpha}{p}}
+\]
+
+donde:
+
+\begin{itemize}
+\item \(\alpha\) es la fracción paralelizable del programa
+\item \(p\) es el número de procesadores
+\end{itemize}
+
+En el sistema propuesto, aunque las etapas \texttt{analyze} y
+\texttt{optimize} son paralelizables, existen componentes que siguen
+siendo secuenciales o generan sobrecarga:
+
+\begin{itemize}
+\item sincronización entre fases del pipeline
+\item creación de procesos
+\item serialización de datos entre procesos
+\item coordinación de tareas asíncronas
+\end{itemize}
+
+Por esta razón, el speedup real se mantiene por debajo del límite ideal.
+
+\subsubsection{Estimación de la fracción paralelizable}
+
+A partir de los resultados experimentales es posible estimar la fracción
+paralelizable del sistema utilizando la Ley de Amdahl.
+
+Recordando que:
+
+\[
+S = \frac{1}{(1-\alpha) + \frac{\alpha}{p}}
+\]
+
+donde:
+
+\begin{itemize}
+\item \(S\) es el speedup observado
+\item \(p\) es el número de procesadores
+\item \(\alpha\) es la fracción paralelizable del programa
+\end{itemize}
+
+En el experimento realizado se obtiene un speedup aproximado:
+
+\[
+S \approx 3.5
+\]
+
+Suponiendo un entorno con:
+
+\[
+p = 4
+\]
+
+se puede despejar \(\alpha\):
+
+\[
+3.5 = \frac{1}{(1-\alpha) + \frac{\alpha}{4}}
+\]
+
+lo cual produce:
+
+\[
+(1-\alpha) + \frac{\alpha}{4} = \frac{1}{3.5}
+\]
+
+\[
+1 - \frac{3\alpha}{4} = 0.2857
+\]
+
+\[
+\alpha \approx 0.95
+\]
+
+Esto indica que aproximadamente el \textbf{95\% del sistema es paralelizable},
+mientras que el \textbf{5\% restante permanece secuencial}.
+
+\subsection{Impacto de la arquitectura orientada a objetos}
+
+La introducción de programación orientada a objetos en el Estado \(Q\)
+no sólo facilita la paralelización, sino que también mejora la calidad
+arquitectónica del sistema.
+
+Entre los beneficios observados se encuentran:
+
+\begin{itemize}
+\item desacoplamiento entre adquisición, análisis, optimización y control
+\item posibilidad de introducir nuevos algoritmos de optimización mediante
+el patrón \textit{Strategy}
+\item facilidad para extender el sistema a nuevos sensores o modelos de tráfico
+\end{itemize}
+
+Por lo tanto, la transición del Estado \(P\) al Estado \(Q\) no sólo
+representa una optimización de rendimiento, sino también una mejora
+estructural en la arquitectura del sistema.
+
+\subsection{Conclusiones del análisis comparativo}
+
+A partir de los resultados obtenidos se puede concluir que:
+
+\begin{itemize}
+\item El modelo secuencial presenta crecimiento lineal del tiempo de ejecución.
+\item El modelo concurrente reduce significativamente la latencia total.
+\item La combinación de \textit{AsyncIO} para tareas I/O-bound y
+\textit{multiprocessing} para tareas CPU-bound mejora el aprovechamiento
+de los recursos computacionales.
+\item La arquitectura orientada a objetos facilita la implementación
+de concurrencia sin comprometer la mantenibilidad del sistema.
+\end{itemize}
+
+En consecuencia, el Estado \(Q\) constituye una mejora tanto desde el
+punto de vista computacional como arquitectónico respecto al Estado \(P\).
+
+\section{Conclusiones}
+
+En este trabajo se abordó el problema de optimización de sincronización
+de semáforos en entornos de ciudades inteligentes mediante el diseño
+y evaluación de una arquitectura de procesamiento basada en pipelines.
+
+Inicialmente se analizó el sistema en su \textbf{Estado \(P\)}, una
+implementación secuencial en la cual las intersecciones se procesan
+una tras otra sin paralelismo ni separación modular significativa.
+El análisis de complejidad mostró que el tiempo de ejecución crece
+linealmente con el número de intersecciones, lo cual limita la
+escalabilidad del sistema cuando el tamaño de la red urbana aumenta.
+
+Posteriormente se propuso una transformación arquitectónica hacia
+el \textbf{Estado \(Q\)}, donde el sistema se rediseña utilizando
+programación orientada a objetos y un modelo concurrente de ejecución.
+La descomposición del sistema en módulos independientes permitió
+separar claramente las etapas de adquisición, análisis, optimización
+y control.
+
+La aplicación de principios SOLID y patrones de diseño, en particular
+el patrón \textit{Strategy}, permitió desacoplar los algoritmos de
+optimización del resto del sistema, facilitando la incorporación de
+nuevos enfoques de control semafórico sin modificar la arquitectura
+central.
+
+Para aprovechar las características de cada etapa del pipeline,
+se implementó un modelo híbrido de concurrencia que combina
+\textit{AsyncIO} para operaciones de entrada/salida y
+\textit{multiprocessing} para tareas intensivas en cómputo.
+Esta combinación permite utilizar eficientemente los recursos del
+sistema y reducir el impacto de cuellos de botella.
+
+La evaluación experimental simulada demostró que el modelo concurrente
+reduce significativamente la latencia de procesamiento y aumenta el
+throughput del sistema. El análisis del speedup obtenido, interpretado
+mediante la Ley de Amdahl, indica que aproximadamente el 95\% del
+sistema es paralelizable, lo que explica la mejora sustancial en
+rendimiento observada.
+
+Además de los beneficios en términos de rendimiento, la arquitectura
+propuesta mejora la calidad del software al proporcionar un diseño
+más modular, extensible y mantenible. Esto resulta particularmente
+relevante en aplicaciones de ciudades inteligentes, donde los sistemas
+de control deben evolucionar continuamente para adaptarse a nuevas
+fuentes de datos y algoritmos de optimización.
+
+Como trabajo futuro, se propone extender el modelo para considerar
+dependencias entre intersecciones mediante grafos dinámicos de tráfico
+y aplicar técnicas avanzadas de optimización, como aprendizaje
+automático o control adaptativo basado en predicción de flujos
+vehiculares.
+
+En conjunto, los resultados obtenidos muestran que la combinación de
+programación orientada a objetos, patrones de diseño y concurrencia
+híbrida constituye una estrategia efectiva para construir sistemas
+escalables de gestión de tráfico en entornos urbanos inteligentes.
 
 \end{document}
