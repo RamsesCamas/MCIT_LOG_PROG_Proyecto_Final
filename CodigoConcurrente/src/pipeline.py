@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from typing import Optional
 from .acquisition import TrafficSensorReaderAsync
 from .processing import TrafficAnalyzer
 from .optimization.interfaces import ISignalOptimizer
@@ -14,17 +15,19 @@ class IntersectionPipeline:
     """Componente de adquisición: lee datos de sensores de tráfico de forma
     asíncrona (I/O-bound) y devuelve un ``TrafficData``."""
 
-    analyzer: TrafficAnalyzer
-    """Componente de procesamiento: extrae métricas (densidad, flujo, cola)
-    a partir de los datos crudos del sensor (CPU-bound)."""
-
-    optimizer: ISignalOptimizer
-    """Componente de optimización: aplica una estrategia (Strategy pattern)
-    para generar un ``SignalPlan`` a partir de las métricas analizadas."""
-
     controller: TrafficControllerAsync
     """Componente de control: envía el plan de señalización al semáforo
     de forma asíncrona (I/O-bound) y devuelve el ``LightState`` resultante."""
+
+    analyzer: Optional[TrafficAnalyzer] = None
+    """Componente de procesamiento (opcional): extrae métricas (densidad,
+    flujo, cola) a partir de los datos crudos del sensor (CPU-bound).
+    Solo requerido cuando se utiliza el método ``process``."""
+
+    optimizer: Optional[ISignalOptimizer] = None
+    """Componente de optimización (opcional): aplica una estrategia
+    (Strategy pattern) para generar un ``SignalPlan`` a partir de las
+    métricas analizadas. Solo requerido cuando se utiliza ``process``."""
 
     async def process(self, intersection_id: int) -> LightState:
         """Ejecuta el flujo completo del pipeline para una intersección.
@@ -40,7 +43,16 @@ class IntersectionPipeline:
         -------
         LightState
             Estado final del semáforo tras aplicar el plan optimizado.
+        Raises
+        ------
+        RuntimeError
+            Si ``analyzer`` u ``optimizer`` no fueron proporcionados.
         """
+        if self.analyzer is None or self.optimizer is None:
+            raise RuntimeError(
+                "analyzer y optimizer son requeridos para ejecutar process()"
+            )
+
         data = await self.reader.read(intersection_id)
         features = self.analyzer.analyze(data)
         plan = self.optimizer.optimize(features)

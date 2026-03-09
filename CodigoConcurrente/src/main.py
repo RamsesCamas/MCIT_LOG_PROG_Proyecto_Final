@@ -7,8 +7,6 @@ from typing import List
 
 from .config import SimConfig
 from .acquisition import TrafficSensorReaderAsync
-from .processing import TrafficAnalyzer
-from .optimization.factory import create_optimizer
 from .control import TrafficControllerAsync
 from .pipeline import IntersectionPipeline
 from .orchestrator_q import OrchestratorQ
@@ -28,14 +26,10 @@ def parse_args() -> argparse.Namespace:
 async def run_experiment(cfg: SimConfig, n: int, cycles: int, workers: int) -> None:
     # --- Construcción POO (coherente con tu sección POO)
     reader = TrafficSensorReaderAsync(cfg)
-    analyzer = TrafficAnalyzer(cfg)  # (se usa para el modelo; el worker reconstruye para multiprocessing)
-    optimizer = create_optimizer(cfg.optimizer_id)  # Strategy + Factory
     controller = TrafficControllerAsync(cfg)
 
     pipeline = IntersectionPipeline(
         reader=reader,
-        analyzer=analyzer,
-        optimizer=optimizer,
         controller=controller,
     )
 
