@@ -25,11 +25,11 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--seed", type=int, default=1234, help="Semilla")
     return ap.parse_args()
 
-async def run_experiment(cfg: SimConfig, n: int, cycles: int, workers: int) -> None:
+async def run_experiment(cfg: SimConfig, n: int, cycles: int, workers: int, optimizer_id: str) -> None:
     # --- Construcción POO (coherente con tu sección POO)
     reader = TrafficSensorReaderAsync(cfg)
     analyzer = TrafficAnalyzer(cfg)  # (se usa para el modelo; el worker reconstruye para multiprocessing)
-    optimizer = create_optimizer(cfg.optimizer_id)  # Strategy + Factory
+    optimizer = create_optimizer(optimizer_id)  # Strategy + Factory
     controller = TrafficControllerAsync(cfg)
 
     pipeline = IntersectionPipeline(
@@ -52,7 +52,7 @@ async def run_experiment(cfg: SimConfig, n: int, cycles: int, workers: int) -> N
         print(f"[cycle {c}] wall_time={wall:.3f}s | per_intersection={wall/max(n,1):.4f}s | throughput~{n/max(wall,1e-9):.1f}/s")
 
     avg = sum(times) / max(len(times), 1)
-    print(f"Summary: cycles={len(times)} | avg={avg:.3f}s | max={max(times):.3f}s | workers={workers} | optimizer={cfg.optimizer_id}")
+    print(f"Summary: cycles={len(times)} | avg={avg:.3f}s | max={max(times):.3f}s | workers={workers} | optimizer={optimizer_id}")
 
 def main() -> None:
     args = parse_args()
@@ -65,7 +65,7 @@ def main() -> None:
         optimizer_id=args.optimizer,
     )
 
-    asyncio.run(run_experiment(cfg=cfg, n=args.n, cycles=args.cycles, workers=args.workers))
+    asyncio.run(run_experiment(cfg=cfg, n=args.n, cycles=args.cycles, workers=args.workers, optimizer_id=args.optimizer))
 
 if __name__ == "__main__":
     main()
