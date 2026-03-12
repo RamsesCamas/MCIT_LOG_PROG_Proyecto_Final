@@ -9,22 +9,30 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List
 
-ROOT = Path(__file__).resolve().parent
+# compare_P_vs_Q.py vive en benchmarks/
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+# La raíz real del proyecto es la carpeta padre de benchmarks/
+ROOT = SCRIPT_DIR.parent
+
 SEQ_SCRIPT = ROOT / "CodigoSecuencial" / "run_p0.py"
 CONC_DIR = ROOT / "CodigoConcurrente"
-RESULTS_DIR = ROOT / "benchmarks"
+RESULTS_DIR = SCRIPT_DIR
 RESULTS_CSV = RESULTS_DIR / "results.csv"
 
 N_VALUES = [10, 25, 50, 100, 200]
 CYCLES = 3
 WORKERS_FULL = 4
+
 BASE_ARGS = {
     "cycles": CYCLES,
     "cpu_work": 30000,
     "seed": 1234,
 }
 
-SUMMARY_RE = re.compile(r"Summary:\s+cycles=(?P<cycles>\d+)\s+\|\s+avg=(?P<avg>[0-9.]+)s")
+SUMMARY_RE = re.compile(
+    r"Summary:\s+cycles=(?P<cycles>\d+)\s+\|\s+avg=(?P<avg>[0-9.]+)s"
+)
 
 
 def run_command(cmd: List[str], cwd: Path | None = None) -> str:
@@ -110,9 +118,9 @@ def main() -> None:
         rows.append(row)
 
         print(f"n={n}")
-        print(f"  T_P        = {t_p:.6f}s")
-        print(f"  T_Q async  = {t_q_async:.6f}s")
-        print(f"  T_Q full   = {t_q_full:.6f}s")
+        print(f"  T_P           = {t_p:.6f}s")
+        print(f"  T_Q async     = {t_q_async:.6f}s")
+        print(f"  T_Q full      = {t_q_full:.6f}s")
         print(f"  Speedup async = {speedup_async:.6f}")
         print(f"  Speedup full  = {speedup_full:.6f}")
         print(f"  Efficiency    = {efficiency:.6f} (S/p, p={WORKERS_FULL})")
