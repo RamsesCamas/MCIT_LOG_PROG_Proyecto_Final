@@ -3,6 +3,7 @@ import argparse
 import random
 import time
 import math
+import statistics
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
 
@@ -113,8 +114,14 @@ def main() -> None:
         times.append(wall)
         print(f"[cycle {c}] wall_time={wall:.3f}s | per_intersection={wall/max(args.n,1):.4f}s")
 
-    avg = sum(times) / max(len(times), 1)
-    print(f"Summary: cycles={len(times)} | avg={avg:.3f}s | max={max(times):.3f}s")
+    avg = statistics.mean(times) if times else 0.0
+    min_t = min(times) if times else 0.0
+    max_t = max(times) if times else 0.0
+    std_t = statistics.stdev(times) if len(times) > 1 else 0.0
+
+    print(
+        f"Summary: cycles={len(times)} | avg={avg:.3f}s | min={min_t:.3f}s | max={max_t:.3f}s | std={std_t:.3f}s"
+    )
 
 if __name__ == "__main__":
     main()

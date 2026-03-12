@@ -5,23 +5,22 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
+import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
-# compare_P_vs_Q.py vive en benchmarks/
 SCRIPT_DIR = Path(__file__).resolve().parent
-
-# La raíz real del proyecto es la carpeta padre de benchmarks/
 ROOT = SCRIPT_DIR.parent
 
 SEQ_SCRIPT = ROOT / "CodigoSecuencial" / "run_p0.py"
 CONC_DIR = ROOT / "CodigoConcurrente"
+
 RESULTS_DIR = SCRIPT_DIR
 RESULTS_CSV = RESULTS_DIR / "results.csv"
 
 N_VALUES = [10, 25, 50, 100, 200]
-CYCLES = 3
+CYCLES = 30
+WORKERS_ASYNC = 1
 WORKERS_FULL = 4
 
 BASE_ARGS = {
@@ -31,29 +30,43 @@ BASE_ARGS = {
 }
 
 SUMMARY_RE = re.compile(
-    r"Summary:\s+cycles=(?P<cycles>\d+)\s+\|\s+avg=(?P<avg>[0-9.]+)s"
+    r"Summary:\s+cycles=(?P<cycles>\d+)\s+\|\s+avg=(?P<avg>[0-9.]+)s(?:\s+\|\s+min=(?P<min>[0-9.]+)s)?(?:\s+\|\s+max=(?P<max>[0-9.]+)s)?(?:\s+\|\s+std=(?P<std>[0-9.]+)s)?"
 )
 
 
-def run_command(cmd: List[str], cwd: Path | None = None) -> str:
-    with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8", delete=True) as tmp:
-        subprocess.run(
-            cmd,
-            cwd=str(cwd) if cwd else None,
-            stdout=tmp,
-            stderr=subprocess.STDOUT,
-            text=True,
-            check=True,
-        )
-        tmp.seek(0)
-        return tmp.read()
+def run_command(cmd: List[str], cwd: Path | None = None) -> Tuple[str, float]:
+    start = time.perf_counter()
+
+    completed = subprocess.run(
+        cmd,
+        cwd=str(cwd) if cwd else None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=True,
+    )
+
+    elapsed = time.perf_counter() - start
+
+    return completed.stdout, elapsed
 
 
-def parse_avg(stdout: str) -> float:
+def parse_summary(stdout: str) -> Dict[str, float]:
     match = SUMMARY_RE.search(stdout)
+
     if not match:
-        raise ValueError(f"No se pudo parsear el tiempo promedio desde stdout:\n{stdout}")
-    return float(match.group("avg"))
+        raise ValueError(f"No se pudo parsear el summary:\n{stdout}")
+
+    def to_float(name: str) -> float:
+        value = match.group(name)
+        return float(value) if value is not None else 0.0
+
+    return {
+        "avg": to_float("avg"),
+        "min": to_float("min"),
+        "max": to_float("max"),
+        "std": to_float("std"),
+    }
 
 
 def build_seq_cmd(n: int) -> List[str]:
@@ -84,27 +97,41 @@ def safe_div(a: float, b: float) -> float:
 
 
 def main() -> None:
+
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    cpu_cores = os.cpu_count() or 1
     rows: List[Dict[str, float | int]] = []
 
-    print(f"Detected CPU cores: {cpu_cores}")
-    print(f"Using workers for Q full: {WORKERS_FULL}")
+    cpu_cores = os.cpu_count() or 1
+
+    print("======================================")
+    print(" Benchmark P vs Q")
+    print("======================================")
+    print(f"CPU cores detectados : {cpu_cores}")
+    print(f"Cycles por prueba    : {CYCLES}")
+    print(f"Workers async (Q1)   : {WORKERS_ASYNC}")
+    print(f"Workers full  (Q4)   : {WORKERS_FULL}")
     print()
 
     for n in N_VALUES:
-        stdout_p = run_command(build_seq_cmd(n), cwd=ROOT)
-        stdout_q_async = run_command(build_q_cmd(n, workers=1), cwd=CONC_DIR)
-        stdout_q_full = run_command(build_q_cmd(n, workers=WORKERS_FULL), cwd=CONC_DIR)
 
-        t_p = parse_avg(stdout_p)
-        t_q_async = parse_avg(stdout_q_async)
-        t_q_full = parse_avg(stdout_q_full)
+        stdout_p, wall_p = run_command(build_seq_cmd(n), cwd=ROOT)
+        stdout_q_async, wall_q_async = run_command(build_q_cmd(n, WORKERS_ASYNC), cwd=CONC_DIR)
+        stdout_q_full, wall_q_full = run_command(build_q_cmd(n, WORKERS_FULL), cwd=CONC_DIR)
+
+        p_stats = parse_summary(stdout_p)
+        q_async_stats = parse_summary(stdout_q_async)
+        q_full_stats = parse_summary(stdout_q_full)
+
+        t_p = p_stats["avg"]
+        t_q_async = q_async_stats["avg"]
+        t_q_full = q_full_stats["avg"]
 
         speedup_async = safe_div(t_p, t_q_async)
         speedup_full = safe_div(t_p, t_q_full)
-        efficiency = safe_div(speedup_full, WORKERS_FULL)
+
+        speedup_parallel = safe_div(t_q_async, t_q_full)
+        efficiency = safe_div(speedup_parallel, WORKERS_FULL)
 
         row = {
             "n": n,
@@ -115,19 +142,30 @@ def main() -> None:
             "speedup_full": round(speedup_full, 6),
             "efficiency": round(efficiency, 6),
         }
+
         rows.append(row)
 
-        print(f"n={n}")
-        print(f"  T_P           = {t_p:.6f}s")
-        print(f"  T_Q async     = {t_q_async:.6f}s")
-        print(f"  T_Q full      = {t_q_full:.6f}s")
-        print(f"  Speedup async = {speedup_async:.6f}")
-        print(f"  Speedup full  = {speedup_full:.6f}")
-        print(f"  Efficiency    = {efficiency:.6f} (S/p, p={WORKERS_FULL})")
-        print(f"  CPU cores     = {cpu_cores}")
+        print(f"n = {n}")
+        print(f"  T_P avg       = {t_p:.6f}s")
+        print(f"    min/max/std = {p_stats['min']:.6f}s / {p_stats['max']:.6f}s / {p_stats['std']:.6f}s")
+        print(f"  T_Q_async avg = {t_q_async:.6f}s")
+        print(f"    min/max/std = {q_async_stats['min']:.6f}s / {q_async_stats['max']:.6f}s / {q_async_stats['std']:.6f}s")
+        print(f"  T_Q_full avg  = {t_q_full:.6f}s")
+        print(f"    min/max/std = {q_full_stats['min']:.6f}s / {q_full_stats['max']:.6f}s / {q_full_stats['std']:.6f}s")
+        print()
+        print(f"  Speedup_arch  = {speedup_async:.6f}   (P / Q_async)")
+        print(f"  Speedup_total = {speedup_full:.6f}   (P / Q_full)")
+        print(f"  Speedup_par   = {speedup_parallel:.6f}   (Q_async / Q_full)")
+        print(f"  Efficiency    = {efficiency:.6f}")
+        print()
+        print(f"  Wall_P        = {wall_p:.6f}s")
+        print(f"  Wall_Q_async  = {wall_q_async:.6f}s")
+        print(f"  Wall_Q_full   = {wall_q_full:.6f}s")
+        print("--------------------------------------")
         print()
 
     with RESULTS_CSV.open("w", newline="", encoding="utf-8") as f:
+
         writer = csv.DictWriter(
             f,
             fieldnames=[
@@ -140,10 +178,13 @@ def main() -> None:
                 "efficiency",
             ],
         )
+
         writer.writeheader()
         writer.writerows(rows)
 
+    print("======================================")
     print(f"CSV generado en: {RESULTS_CSV}")
+    print("======================================")
 
 
 if __name__ == "__main__":

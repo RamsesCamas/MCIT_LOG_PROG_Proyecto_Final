@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import random
 import time
+import statistics
 from typing import List
 
 from .config import SimConfig
@@ -56,8 +57,14 @@ async def run_experiment(cfg: SimConfig, n: int, cycles: int, workers: int) -> N
 
     orch.shutdown()
 
-    avg = sum(times) / max(len(times), 1)
-    print(f"Summary: cycles={len(times)} | avg={avg:.3f}s | max={max(times):.3f}s | workers={workers} | optimizer={cfg.optimizer_id}")
+    avg = statistics.mean(times) if times else 0.0
+    min_t = min(times) if times else 0.0
+    max_t = max(times) if times else 0.0
+    std_t = statistics.stdev(times) if len(times) > 1 else 0.0
+
+    print(
+        f"Summary: cycles={len(times)} | avg={avg:.3f}s | min={min_t:.3f}s | max={max_t:.3f}s | std={std_t:.3f}s | workers={workers} | optimizer={cfg.optimizer_id}"
+    )
 
 def main() -> None:
     args = parse_args()
