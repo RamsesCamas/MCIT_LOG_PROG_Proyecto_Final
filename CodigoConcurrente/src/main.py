@@ -25,18 +25,22 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--seed", type=int, default=1234, help="Semilla")
     return ap.parse_args()
 
-async def run_experiment(cfg: SimConfig, n: int, cycles: int, workers: int, optimizer_id: str) -> None:
-    # --- Construcción POO (coherente con tu sección POO)
+async def run_experiment(cfg: SimConfig, n: int, cycles: int, workers: int) -> None:
     reader = TrafficSensorReaderAsync(cfg)
-    analyzer = TrafficAnalyzer(cfg)  # (se usa para el modelo; el worker reconstruye para multiprocessing)
-    optimizer = create_optimizer(optimizer_id)  # Strategy + Factory
     controller = TrafficControllerAsync(cfg)
+
+    if workers == 1:
+        analyzer = TrafficAnalyzer(cfg)
+        optimizer = create_optimizer(cfg.optimizer_id)
+    else:
+        analyzer = None
+        optimizer = None
 
     pipeline = IntersectionPipeline(
         reader=reader,
+        controller=controller,
         analyzer=analyzer,
         optimizer=optimizer,
-        controller=controller,
     )
 
     orch = OrchestratorQ(pipeline=pipeline, workers=workers)
@@ -45,14 +49,15 @@ async def run_experiment(cfg: SimConfig, n: int, cycles: int, workers: int, opti
     times: List[float] = []
     for c in range(1, cycles + 1):
         t0 = time.perf_counter()
-        _ = await orch.run_cycle(ids)
-        t1 = time.perf_counter()
-        wall = t1 - t0
+        await orch.run_cycle(ids)
+        wall = time.perf_counter() - t0
         times.append(wall)
         print(f"[cycle {c}] wall_time={wall:.3f}s | per_intersection={wall/max(n,1):.4f}s | throughput~{n/max(wall,1e-9):.1f}/s")
 
+    orch.shutdown()
+
     avg = sum(times) / max(len(times), 1)
-    print(f"Summary: cycles={len(times)} | avg={avg:.3f}s | max={max(times):.3f}s | workers={workers} | optimizer={optimizer_id}")
+    print(f"Summary: cycles={len(times)} | avg={avg:.3f}s | max={max(times):.3f}s | workers={workers} | optimizer={cfg.optimizer_id}")
 
 def main() -> None:
     args = parse_args()
@@ -65,7 +70,7 @@ def main() -> None:
         optimizer_id=args.optimizer,
     )
 
-    asyncio.run(run_experiment(cfg=cfg, n=args.n, cycles=args.cycles, workers=args.workers, optimizer_id=args.optimizer))
+    asyncio.run(run_experiment(cfg=cfg, n=args.n, cycles=args.cycles, workers=args.workers))
 
 if __name__ == "__main__":
     main()
