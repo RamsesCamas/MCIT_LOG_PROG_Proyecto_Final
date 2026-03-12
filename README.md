@@ -119,8 +119,7 @@ Esto permite aprovechar mejor los recursos del sistema.
     │   │   └── optimization/
     │   │       ├── interfaces.py
     │   │       ├── strategies.py
-    │   │       ├── factory.py
-    │   │       └── impl.py
+    │   │       └── factory.py
     │
     ├── Documentacion/
     │   ├── reporte.tex
@@ -133,8 +132,8 @@ Esto permite aprovechar mejor los recursos del sistema.
 
 Para ejecutar el sistema:
 
-    cd CodigoConcurrente/src
-    python main.py
+  cd CodigoConcurrente
+  python -m src.main
 
 ------------------------------------------------------------------------
 
