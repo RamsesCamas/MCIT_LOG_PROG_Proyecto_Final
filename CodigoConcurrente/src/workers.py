@@ -3,7 +3,7 @@ from typing import Tuple
 from .domain import TrafficData, Features, SignalPlan
 from .config import SimConfig
 from .processing import TrafficAnalyzer
-from .optimization.strategies import STRATEGY_MAP
+from .optimization.factory import create_optimizer
 
 def analyze_and_optimize_worker(data: TrafficData, cfg: SimConfig, optimizer_id: str) -> Tuple[Features, SignalPlan]:
     """Worker CPU-bound para ProcessPool.
@@ -14,9 +14,7 @@ def analyze_and_optimize_worker(data: TrafficData, cfg: SimConfig, optimizer_id:
     analyzer = TrafficAnalyzer(cfg)
     features = analyzer.analyze(data)
 
-    fn = STRATEGY_MAP.get(optimizer_id)
-    if fn is None:
-        raise ValueError(f"Unknown optimizer_id={optimizer_id!r}")
-    plan = fn(features)
+    optimizer = create_optimizer(optimizer_id)
+    plan = optimizer.optimize(features)
 
     return features, plan
